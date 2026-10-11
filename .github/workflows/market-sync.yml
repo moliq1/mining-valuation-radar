@@ -1,0 +1,66 @@
+name: Market EOD sync (licensed provider)
+on:
+  schedule:
+    # 19:25 China/Hong Kong on weekdays; can be delayed by GitHub Actions.
+    - cron: '25 11 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run validation without committing data'
+        type: boolean
+        default: true
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: market-eod-sync
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+      MARKET_DATA_PUBLICATION_AUTHORIZED: ${{ vars.MARKET_DATA_PUBLICATION_AUTHORIZED }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check prerequisites
+        id: ready
+        shell: bash
+        run: |
+          if [[ "${MARKET_DATA_PUBLICATION_AUTHORIZED}" != "true" || -z "${TWELVE_DATA_API_KEY}" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "⚠ Market sync not activated. Requires licensed provider API key and explicit publication-rights confirmation." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Fetch licensed daily EOD quotes
+        if: steps.ready.outputs.ready == 'true'
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry_run }}" == "true" ]]; then
+            node scripts/update-market.mjs --dry-run
+          else
+            node scripts/update-market.mjs
+          fi
+      - name: Run tests on changed snapshot
+        if: steps.ready.outputs.ready == 'true'
+        run: npm test
+      - name: Commit validated public quotes
+        if: steps.ready.outputs.ready == 'true' && (github.event_name == 'schedule' || inputs.dry_run == false)
+        shell: bash
+        run: |
+          if git diff --quiet -- data/snapshot.json; then
+            echo "No new valid quotes." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/snapshot.json
+          git commit -m "data: update licensed end-of-day quotes"
+          git push

@@ -37,7 +37,10 @@ export function stockStatus(stock, company, market) {
   const m=stockMetrics(stock,company,market);
   const metalChange=market.metal5d[company.primaryMetal];
   const lowConf = company.confidence === '低';
-  const verified=stock.event==='none' && stock.cashflow==='pass' && stock.quality==='complete' && !lowConf;
+  const asOfMillis=Date.parse(stock.asOf+'T00:00:00Z');
+  const age=Number.isFinite(asOfMillis)?(Date.now()-asOfMillis)/86400000:Infinity;
+  const fresh=age>=-1&&age<=10;
+  const verified=fresh && stock.event==='none' && stock.cashflow==='pass' && stock.quality==='complete' && !lowConf;
   if(!(m.base>0)) return {code:'unpriced',text:'无法估值',tone:'neutral'};
   if(m.margin>=0.25 && finite(m.change5d) && finite(metalChange) && m.change5d<=-0.08 && metalChange>=-0.03 && verified)
     return {code:'watch',text:'疑似情绪错杀',tone:'positive'};

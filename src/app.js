@@ -1,7 +1,10 @@
 import {CASES,CASE_LABEL,METAL_LABEL,companyValue,stockMetrics,stockStatus,ahPairs,validateSnapshot,finite} from './model.js';
+import {reconcileSnapshot} from './market-sync.js';
 const BASE_URL=new URL('../data/snapshot.json',import.meta.url);
 
 const LS='ore-mining-radar-v1';
+const FEED_NOTE='历史行情/收盘数据可能延迟，且不同交易所休市日不一致；没有配置获授权的行情源时，网页不会自动更新。';
+
 const navs=[['overview','◫','研究总览'],['valuation','▦','估值矩阵'],['scenario','◈','情景实验室'],['spread','⇆','A / H 比价'],['signals','⚑','错杀雷达'],['sources','≡','数据与来源']];
 const app=document.getElementById('app');
 const state={data:null,tab:location.hash.replace('#','')||'overview',labCompany:'zijin',labCase:'base',selected:'01787.HK',board:'all',search:'',message:''};
@@ -25,9 +28,9 @@ function shell(){
  return `<div class="layout">
  <aside class="sidebar"><div class="brand"><div class="logo-mark">◆</div><div><div class="brand-main">ORE RADAR</div><div class="brand-sub">GLOBAL METALS RESEARCH</div></div></div>
  <div><div class="nav-label">INVESTMENT TERMINAL</div><nav class="nav-group">${navs.map(([id,ico,name])=>`<button class="nav-item ${id===state.tab?'active':''}" data-tab="${id}"><span class="symbol">${ico}</span>${name}</button>`).join('')}</nav></div>
- <div class="sidebar-bottom"><strong><span class="live-dot"></span>离线研究模型</strong><p>已内置 2026H1 财报参数。行情手工录入，不连接实时交易所报价。</p></div><div class="version">ORE / V1.0 · LOCAL FIRST</div></aside>
- <main class="main"><header class="topbar"><div class="breadcrumb">研究工作台　/　<b>${esc(navs.find(n=>n[0]===state.tab)?.[2]||'研究总览')}</b></div><div class="top-actions"><span class="asof">快照截至 ${esc(state.data.updatedAt)}</span><button class="button tiny" data-action="export">↓ 导出 JSON</button><label class="button tiny" for="file-input">↑ 导入数据</label><input id="file-input" type="file" accept="application/json,.json" hidden></div></header>
- <div class="hero"><div><div class="eyebrow">QUANTITATIVE RESEARCH / COMMODITIES</div><h1>全球金银铜矿业 · 估值雷达</h1><p>用可解释的盈利模型，识别商品价格变化与 A/H 股票定价之间的预期差。</p></div><div class="hero-actions"><span class="datepill">◉ 历史快照 · 非实时</span><button data-action="reset" class="button">↺ 重置基准</button></div></div>
+ <div class="sidebar-bottom"><strong><span class="live-dot"></span>研究快照 · 可选EOD同步</strong><p>数据来自历史研究参数或获授权的 EOD 收盘行情，不是实时交易所报价。重大公告与现金流仍须人工核验。</p></div><div class="version">ORE / V1.1 · RESEARCH FIRST</div></aside>
+ <main class="main"><header class="topbar"><div class="breadcrumb">研究工作台　/　<b>${esc(navs.find(n=>n[0]===state.tab)?.[2]||'研究总览')}</b></div><div class="top-actions"><span class="asof">快照截至 ${esc(state.data.updatedAt)}</span><button class="button tiny" data-action="refresh-source">↻ 获取最新快照</button><button class="button tiny" data-action="export">↓ 导出 JSON</button><label class="button tiny" for="file-input">↑ 导入数据</label><input id="file-input" type="file" accept="application/json,.json" hidden></div></header>
+ <div class="hero"><div><div class="eyebrow">QUANTITATIVE RESEARCH / COMMODITIES</div><h1>全球金银铜矿业 · 估值雷达</h1><p>用可解释的盈利模型，识别商品价格变化与 A/H 股票定价之间的预期差。</p></div><div class="hero-actions"><span class="datepill">◉ ${state.data.marketFeed?.updatedTickers?.length?`EOD 数据：${state.data.marketFeed.updatedTickers.length}/12更新`:`历史快照 · 非实时`}</span><button data-action="reset" class="button">↺ 重置基准</button></div></div>
  ${state.message?`<div class="note-block" role="status" style="margin-bottom:15px">${esc(state.message)}</div>`:''}
  <div id="content">${page()}</div>
  <footer class="footer-note">ORE Radar © 2026　/　仅用于投研假设和风险筛选。${esc(note)} 真实交易前请复核所有输入、披露公告及交易费用。</footer>
@@ -103,9 +106,17 @@ function signalsPage(){
 }
 function sourcesPage(){
  return `${sectionTitle('来源与数据治理','研究透明比漂亮的预测数字更重要。财报口径、价格日期、假设和模型局限全部公开。',`<button class="button" data-action="export">↓ 导出当前研究快照</button>`)}
+ ${state.data.marketFeed?`<div class="note-block" style="margin-bottom:18px"><strong>行情同步记录：</strong>${esc(state.data.marketFeed.provider)} · 检查于 ${esc(state.data.marketFeed.checkedAt)} · 本批有效股票 ${esc(state.data.marketFeed.updatedTickers?.length??0)}/12 · 异常 ${esc(state.data.marketFeed.errors?.length??0)} 条。<br>收盘数据非实时。基本面风险核验保持人工控制；没有公开传播许可请勿开启外部报价发布。</div>`:`<div class="note-block" style="margin-bottom:18px"><strong>未启用自动行情：</strong>当前仍为历史快照。获取最新行情需要由仓库所有者配置有 A/H 市场权限的行情源，并确认公开传播许可。</div>`}
  <div class="panel" style="margin-bottom:18px"><div class="panel-heading"><div><h2>模型全局假设</h2><p>修改后可通过 JSON 导入导出保存，状态默认保存在当前浏览器。</p></div></div><div class="small-form" style="grid-template-columns:repeat(4,minmax(0,1fr))"><div><label class="field-label">USD/CNY</label><input class="field mono" type="number" min="0.01" step="0.001" value="${state.data.market.usdCny}" data-marketfield="usdCny"/></div><div><label class="field-label">HKD/CNY</label><input class="field mono" type="number" min="0.01" step="0.001" value="${state.data.market.hkdCny}" data-marketfield="hkdCny"/></div><div><label class="field-label">研究快照日期</label><input type="date" class="field" value="${esc(state.data.updatedAt)}" data-marketfield="updatedAt"/></div><div><label class="field-label">数据类型</label><input readonly class="field" value="历史快照 / 非实时"/></div></div></div>
  <div class="sources-grid">${state.data.companies.map(c=>`<div class="panel source-card"><div class="panel-heading" style="margin-bottom:8px"><div><h3>${esc(c.name)}</h3><span class="date-text">${esc(c.sector)} · 可信度 ${esc(c.confidence)}</span></div>${tag(c.profitType,c.profitType.includes('非扣非')?'gold':'blue')}</div><div class="list-row"><span>2026H1利润</span><b class="mono">${fmt(c.profitH1,2)} 亿${c.profitCurrency==='USD'?'美元':'元'}</b></div><div class="list-row"><span>总股本</span><b class="mono">${fmt(c.sharesYi,3)} 亿股</b></div><div class="list-row"><span>H1 金 / 银 / 铜量</span><span class="mono" style="font-size:10px">${fmt(c.volumesH1.gold,2)}t / ${fmt(c.volumesH1.silver,1)}t / ${fmt(c.volumesH1.copper,0)}t</span></div><p>${esc(c.note)}</p><a href="${link(c.source)}" target="_blank" rel="noopener noreferrer">来源材料 ↗</a></div>`).join('')}</div>
  <div class="note-block" style="margin-top:19px"><strong>局限与检查清单：</strong>① 部分H1利润为归母非扣非；② 部分金属“产量”用作“销量”的近似代理；③ 固定利润留存系数无法反映全部税费、少数股东、套保、AISC和资本开支；④ 洛阳钼业钴/钨与增发稀释未完整建模；⑤ 盛达资源销量口径待验证；⑥ 不自动获取行情。建议用最新三季报及时修正基线。</div>`;
+}
+async function refreshRemote(){
+ try{const response=await fetch(BASE_URL,{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const remote=await response.json();validateSnapshot(remote);
+ const merged=reconcileSnapshot(remote,state.data);
+ if(merged===state.data){toast('当前浏览器已经使用不早于服务器的快照；如需丢弃自定义参数，请使用重置基准。');return;}
+ state.data=merged;save();toast('已读取服务器收盘快照；保留本地估值情景与 PE 假设；新收盘价的公告核验已重置为待确认。');
+ }catch(e){toast('更新快照失败：'+e.message);}
 }
 function render(){document.title=`${navs.find(n=>n[0]===state.tab)?.[2]||'研究总览'} | ORE RADAR`;app.className='';app.innerHTML=shell();}
 function toast(s){state.message=s;render();}
@@ -113,6 +124,7 @@ function triggerDownload(data,name,mime){const blob=new Blob([data],{type:mime})
 function changed(target) {
  if(target.dataset.tab){const next=target.dataset.tab;state.tab=next;state.message='';history.replaceState(null,'','#'+next);render();return;}
  if(target.dataset.pick){state.selected=target.dataset.pick;render();return;}
+ if(target.dataset.action==='refresh-source'){refreshRemote();return;}
  if(target.dataset.action==='export'){triggerDownload(JSON.stringify(state.data,null,2),'ore-radar-'+new Date().toISOString().slice(0,10)+'.json','application/json');return;}
  if(target.dataset.action==='reset'){if(window.confirm('确定恢复全部默认参数和价格快照吗？浏览器保存的修改将被覆盖。')){localStorage.removeItem(LS);init(true);}return;}
  if(target.dataset.action==='reset-scenarios'){const defaults={bear:{gold:3600,silver:45,copper:10000},base:{gold:4200,silver:65,copper:12500},bull:{gold:4800,silver:85,copper:14500}};state.data.market.scenarios=defaults;save();render();return;}
@@ -140,9 +152,9 @@ app.addEventListener('change',e=>{
 });
 window.addEventListener('hashchange',()=>{const h=location.hash.replace('#','');if(navs.some(x=>x[0]===h)){state.tab=h;render();}});
 async function init(reset=false){
- try{const r=await fetch(BASE_URL);if(!r.ok)throw Error('HTTP '+r.status);const defaultData=await r.json();validateSnapshot(defaultData);
+ try{const r=await fetch(BASE_URL,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const defaultData=await r.json();validateSnapshot(defaultData);
   let stored=null;if(!reset){try{stored=JSON.parse(localStorage.getItem(LS)||'null');if(stored)validateSnapshot(stored);}catch{try{localStorage.removeItem(LS);}catch{}stored=null;}}
-  state.data=stored||defaultData;state.message='';render();
+  state.data=stored?reconcileSnapshot(defaultData,stored):defaultData;if(state.data!==stored)save();state.message='';render();
  }catch(e){app.innerHTML=`<div class="loading-block" style="margin:15vh auto;max-width:580px;padding:30px;background:white;border-radius:18px"><h2>无法读取数据</h2><p>${esc(e.message)}</p><p>请在本项目目录启动本地 HTTP 服务：<code>python3 -m http.server 4173</code>，然后打开 http://127.0.0.1:4173/ ，而不是直接双击 HTML 文件。</p></div>`;}
 }
 init();

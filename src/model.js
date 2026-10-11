@@ -45,6 +45,7 @@ export function stockStatus(stock, company, market) {
   if(m.margin>=0.25 && finite(m.change5d) && finite(metalChange) && m.change5d<=-0.08 && metalChange>=-0.03 && verified)
     return {code:'watch',text:'疑似情绪错杀',tone:'positive'};
   if(stock.event==='material'||stock.cashflow==='fail') return {code:'risk',text:'基本面风险待重估',tone:'negative'};
+  if(!fresh) return {code:'stale',text:'收盘价过期，请更新',tone:'negative'};
   if(m.margin>=0.25) return {code:'discount',text:'折价待核验',tone:'gold'};
   if(m.margin>=0.10) return {code:'observe',text:'继续观察',tone:'blue'};
   return {code:'normal',text:'安全边际不足',tone:'neutral'};

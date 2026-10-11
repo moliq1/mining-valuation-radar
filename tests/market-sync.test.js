@@ -57,3 +57,13 @@ test('provider-error response rejected, missing metal changes remain null',()=>{
  const {snapshot}=applyMarketData(base,{'XAU/USD':p},{checkedAt:'2026-10-11T10:00:00Z'});
  assert.equal(snapshot.market.metal5d.gold,null);
 });
+
+test('stale stock date blocks otherwise-qualified undervaluation',()=>{
+  const s=structuredClone(base);
+  const c=s.companies.find(x=>x.id==='shandong');
+  const st=s.stocks.find(x=>x.ticker==='01787.HK');
+  st.price=10;st.previous5d=11.5;st.event='none';st.cashflow='pass';st.quality='complete';
+  st.asOf='2020-01-01';s.market.metal5d.gold=0;
+  const result=stockStatus(st,c,s.market);
+  assert.equal(result.code,'stale');
+});

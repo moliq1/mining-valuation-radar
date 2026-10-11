@@ -67,3 +67,14 @@ test('stale stock date blocks otherwise-qualified undervaluation',()=>{
   const result=stockStatus(st,c,s.market);
   assert.equal(result.code,'stale');
 });
+
+test('moving to a new EOD date invalidates stale operating-risk checks',()=>{
+ const s=structuredClone(base),target=s.stocks.find(x=>x.ticker==='02899.HK');
+ target.event='none';target.cashflow='pass';target.quality='complete';
+ const {snapshot}=applyMarketData(s,{'02899.HK':fixture()},{checkedAt:'2026-10-11T10:00:00Z'});
+ const updated=snapshot.stocks.find(x=>x.ticker==='02899.HK');
+ assert.equal(updated.asOf,'2026-10-10');
+ assert.equal(updated.event,'unknown');
+ assert.equal(updated.cashflow,'pending');
+ assert.equal(updated.quality,'pending');
+});

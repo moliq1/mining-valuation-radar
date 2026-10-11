@@ -36,6 +36,7 @@ export function applyMarketData(snapshot,quotes,{provider='Twelve Data',checkedA
       const p=parseHistory(q,{mic_code:req.mic_code,currency:req.currency,now:new Date(checkedAt)});
       if(p.date<stock.asOf){report.unchanged.push(stock.ticker+': older');continue;}
       if(p.date===stock.asOf && Math.abs(p.price/stock.price-1)>0.07)throw Error('Same-date price differs by >7% from snapshot');
+      if(p.date>stock.asOf){stock.event='unknown';stock.cashflow='pending';stock.quality='pending';}
       stock.price=p.price;
       stock.asOf=p.date;
       stock.previous5d=p.previous5d;

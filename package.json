@@ -1,0 +1,14 @@
+{
+  "name": "mining-valuation-radar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "金银铜矿业 A/H 动态估值雷达",
+  "scripts": {
+    "dev": "python3 -m http.server 4173 --bind 127.0.0.1",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

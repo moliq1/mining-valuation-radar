@@ -9,7 +9,7 @@ const ISO=/^\d{4}-\d{2}-\d{2}$/;
 const acceptableDate=(date)=>ISO.test(date)&&!Number.isNaN(Date.parse(date+'T00:00:00Z'))&&new Date(date+'T00:00:00Z').toISOString().slice(0,10)===date;
 export function normalizeHistory(raw){
  if(!raw||typeof raw!=='object'||raw.schemaVersion!==1)throw Error('历史数据需要 schemaVersion=1');
- const out={schemaVersion:1,updatedAt:raw.updatedAt||null,provider:String(raw.provider||'未注明'),status:raw.status||'unknown',notes:String(raw.notes||''),series:{}};
+ const out={schemaVersion:1,updatedAt:raw.updatedAt||null,provider:String(raw.provider||'未注明'),status:raw.status||'unknown',notes:String(raw.notes||''),goldInstrument:String(raw.goldInstrument||'XAU/USD'),goldUnit:String(raw.goldUnit||'USD/oz'),series:{}};
  for(const key of HISTORY_KEYS){
   const input=raw.series?.[key];
   if(input===undefined||input===null){out.series[key]=[];continue;}
@@ -54,7 +54,7 @@ export function compareHistory(history,{stock='zijinA',period='6m',mode='indexed
   for(const d of shared)if(!dates.has(d))shared.delete(d);
  }
  const commonDates=[...shared].sort();
- if(commonDates.length<2)return {enough:false,wanted,series:sample,commonDates,threshold,latest,mode,stock,period,reason:'至少需要两个黄金与股票共同交易日才能比较。'};
+ if(commonDates.length<2)return {enough:false,wanted,series:sample,commonDates,threshold,latest,mode,stock,period,goldInstrument:h.goldInstrument,goldUnit:h.goldUnit,reason:'至少需要两个黄金与股票共同交易日才能比较。'};
  const start=commonDates[0],end=commonDates.at(-1);
  const overlap=Object.fromEntries(wanted.map(k=>[k,new Map(sample[k].map(p=>[p.date,p.close]))]));
  const common=commonDates.map(date=>({date,...Object.fromEntries(wanted.map(k=>[k,overlap[k].get(date)]))}));
@@ -64,7 +64,7 @@ export function compareHistory(history,{stock='zijinA',period='6m',mode='indexed
  const totalReturns=Object.fromEntries(wanted.map(k=>[k,common.at(-1)[k]/baseline[k]-1]));
  const correlations={};
  for(const k of wanted.filter(k=>k!=='gold'))correlations[k]=pearsonReturns(common.map(p=>({gold:p.gold,stock:p[k]})));
- return {enough:true,commonDates,commonCount:commonDates.length,wanted,series:chartSeries,baseline,totalReturns,correlations,threshold,start,end,latest,mode,stock,period,provider:h.provider,status:h.status,updatedAt:h.updatedAt};
+ return {enough:true,commonDates,commonCount:commonDates.length,wanted,series:chartSeries,baseline,totalReturns,correlations,threshold,start,end,latest,mode,stock,period,goldInstrument:h.goldInstrument,goldUnit:h.goldUnit,provider:h.provider,status:h.status,updatedAt:h.updatedAt};
 }
 export function pearsonReturns(data){
  const a=[],b=[];
@@ -127,6 +127,7 @@ export function providerHistory(quotes,current,{checkedAt=new Date().toISOString
  const checkDay=checkedAt.slice(0,10);
  for(const [key,[symbol,currency]] of Object.entries(mapping)){
   const payload=quotes[symbol];
+  if(key==='gold'&&old.series.gold?.length&&old.goldInstrument!=='XAU/USD'){errors.push('Cannot merge XAU/USD into existing '+old.goldInstrument);continue;}
   if(!payload||payload.status==='error'||!Array.isArray(payload.values)||payload.values.length<minOverlap){errors.push(symbol+': missing/insufficient provider history');continue;}
   if(payload.meta?.currency && payload.meta.currency.toUpperCase()!==currency){errors.push(symbol+': currency mismatch');continue;}
   if(key==='zijinA'&&payload.meta?.mic_code&&payload.meta.mic_code!=='XSHG'){errors.push(symbol+': wrong exchange');continue;}
@@ -148,6 +149,7 @@ export function providerHistory(quotes,current,{checkedAt=new Date().toISOString
  if(!usable)return {updated:false,history:old,errors:[...errors,'No stock has >= '+minOverlap+' valid gold-matched trading dates']};
  const changed=HISTORY_KEYS.some(k=>JSON.stringify(old.series[k])!==JSON.stringify(next.series[k]));
  if(!changed)return {updated:false,history:old,errors};
+ if(quotes['XAU/USD']?.values?.length && next.series.gold?.length){next.goldInstrument='XAU/USD';next.goldUnit='USD/oz';}
  next.provider='Twelve Data · licensed daily EOD';
  next.status='licensed-eod';
  next.updatedAt=checkDay;

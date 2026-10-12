@@ -61,7 +61,7 @@ export function compareHistory(history,{stock='zijinA',period='6m',mode='indexed
  const baseline=Object.fromEntries(wanted.map(k=>[k,0])); // deliberately initialized below
  for(const k of wanted)baseline[k]=overlap[k].get(start);
  const chartSeries=Object.fromEntries(wanted.map(k=>[k, sample[k].filter(p=>p.date>=start&&p.date<=end).map(p=>({date:p.date,close:p.close,value:mode==='indexed'?p.close/baseline[k]*100:p.close}))]));
- const totalReturns=Object.fromEntries(wanted.map(k=>[k:common.at(-1)[k]/baseline[k]-1]));
+ const totalReturns=Object.fromEntries(wanted.map(k=>[k,common.at(-1)[k]/baseline[k]-1]));
  const correlations={};
  for(const k of wanted.filter(k=>k!=='gold'))correlations[k]=pearsonReturns(common.map(p=>({gold:p.gold,stock:p[k]})));
  return {enough:true,commonDates,commonCount:commonDates.length,wanted,series:chartSeries,baseline,totalReturns,correlations,threshold,start,end,latest,mode,stock,period,provider:h.provider,status:h.status,updatedAt:h.updatedAt};

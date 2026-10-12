@@ -89,3 +89,14 @@ test('Shanghai Au99.99 remains CNY/g and is never relabeled as international XAU
  assert.equal(next.history.goldInstrument,'SGE Au99.99');
  assert.equal(next.history.goldUnit,'CNY/g');
 });
+
+test('CSV can carry Shanghai Au99.99 CNY/g metadata into interactive history',()=>{
+ const x=historyFromCsv('date,gold,zijin_a,zijin_h,gold_instrument,gold_unit\n2026-10-09,895,30,,SGE Au99.99,CNY/g\n2026-10-12,902.9,30.22,32.58,SGE Au99.99,CNY/g\n');
+ assert.equal(x.goldInstrument,'SGE Au99.99');
+ assert.equal(x.goldUnit,'CNY/g');
+ assert.equal(compareHistory(x,{stock:'zijinA',period:'all'}).commonCount,2);
+});
+test('CSV rejects mixed gold instruments or inconsistent units',()=>{
+ assert.throws(()=>historyFromCsv('date,gold,zijin_a,gold_instrument,gold_unit\n2026-10-09,895,30,SGE Au99.99,CNY/g\n2026-10-12,900,31,XAU/USD,USD/oz\n'),/混合/);
+ assert.throws(()=>historyFromCsv('date,gold,zijin_a,gold_instrument,gold_unit\n2026-10-09,895,30,SGE Au99.99,USD/oz\n2026-10-12,900,31,SGE Au99.99,USD/oz\n'),/不支持/);
+});

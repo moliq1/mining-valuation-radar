@@ -170,9 +170,10 @@ def apply_daily_data(snapshot, history, quotes, gold_bars, *, today, gold_name="
             if histkey:
                 oldseries = market_history["series"].get(histkey, [])
                 market_history["series"][histkey] = merge_bars(oldseries, bars)
+            old_day = obj["asOf"]
             obj["price"], obj["asOf"] = close, newday
             obj["previous5d"] = bars[-6][1]
-            if newday > stockmap[ticker].get("_source_date_before", ""):
+            if newday > old_day:
                 # Changing the quote invalidates any old company-risk checklist.
                 obj["event"], obj["cashflow"], obj["quality"] = "unknown", "pending", "pending"
             obj["quoteSource"] = {"provider": source, "underlying": "Eastmoney", "kind": "unadjusted_EOD",

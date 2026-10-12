@@ -55,12 +55,12 @@ jobs:
         if: steps.ready.outputs.ready == 'true' && (github.event_name == 'schedule' || inputs.dry_run == false)
         shell: bash
         run: |
-          if git diff --quiet -- data/snapshot.json; then
+          if git diff --quiet -- data/snapshot.json data/market-history.json; then
             echo "No new valid quotes." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/snapshot.json
+          git add data/snapshot.json data/market-history.json
           git commit -m "data: update licensed end-of-day quotes"
           git push

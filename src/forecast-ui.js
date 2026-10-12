@@ -52,7 +52,7 @@ function forecastScreen(data,p,warning=''){
   <div class="f-summary">
    <div class="f-summary-item"><div class="cap">${p.terminalYear}年归母预测</div><div class="val">${fmt(sel.profitYi,1)}<small> 亿</small></div></div>
    <div class="f-summary-item"><div class="cap">${p.terminalYear}年 EPS（RMB）</div><div class="val">¥${fmt(sel.eps,2)}</div></div>
-   <div class="f-summary-item"><div class="cap">前瞻PE折现价 · A股</div><div class="val">¥${fmt(sel.presentPe,2)}</div></div>
+   <div class="f-summary-item"><div class="cap">折现至2026年末 · A股</div><div class="val">¥${fmt(sel.presentPe,2)}</div><div class="cap" style="margin-top:7px">指定年度未折现：¥${fmt(sel.undiscountedPe,2)}</div></div>
   </div>
   <div class="f-split">
    <div><div class="f-line"><span>A股参考股价</span><strong>¥${fmt(r.stockA,2)}</strong></div><div class="f-line"><span>A股模型安全边际</span><strong class="${r.marginA>=0?'f-positive':'f-negative'}">${pct(r.marginA)}</strong></div><div class="f-line"><span>当前A价隐含${p.terminalYear}年金价</span><strong>${impliedA===null?'模型边界外':'$'+fmt(impliedA,0)+'/oz'}</strong></div><div class="f-muted" style="margin-top:8px">A价日期 ${r.asOfA||'未知'}</div></div>

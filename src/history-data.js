@@ -115,3 +115,42 @@ export function historyFromCsv(csv){
  }
  return normalizeHistory({schemaVersion:1,updatedAt:new Date().toISOString().slice(0,10),provider:'用户导入 CSV（来源未经独立核验）',status:'imported',notes:'黄金单位USD/oz；A股为CNY，H股为HKD；日期必须是当地同一日。',series});
 }
+
+/** Convert licensed Twelve Data daily API responses into strictly dated daily close series.
+ * Do not expose endpoint tokens, estimate gaps, or replace existing series with stale bars.
+ */
+export function providerHistory(quotes,current,{checkedAt=new Date().toISOString(),minOverlap=10}={}){
+ const mapping={gold:['XAU/USD','USD'],zijinA:['601899.SH','CNY'],zijinH:['02899.HK','HKD']};
+ const old=normalizeHistory(current);
+ const next=structuredClone(old);
+ const errors=[];
+ const checkDay=checkedAt.slice(0,10);
+ for(const [key,[symbol,currency]] of Object.entries(mapping)){
+  const payload=quotes[symbol];
+  if(!payload||payload.status==='error'||!Array.isArray(payload.values)||payload.values.length<minOverlap){errors.push(symbol+': missing/insufficient provider history');continue;}
+  if(payload.meta?.currency && payload.meta.currency.toUpperCase()!==currency){errors.push(symbol+': currency mismatch');continue;}
+  if(key==='zijinA'&&payload.meta?.mic_code&&payload.meta.mic_code!=='XSHG'){errors.push(symbol+': wrong exchange');continue;}
+  if(key==='zijinH'&&payload.meta?.mic_code&&payload.meta.mic_code!=='XHKG'){errors.push(symbol+': wrong exchange');continue;}
+  try{
+   const rows=payload.values.map(p=>[String(p.datetime||'').slice(0,10),p.close]);
+   const normalized=normalizeHistory({schemaVersion:1,status:'licensed-eod',series:{[key]:rows}}).series[key];
+   const last=normalized.at(-1)?.date;
+   const age=(Date.parse(checkDay+'T00:00:00Z')-Date.parse(last+'T00:00:00Z'))/86400000;
+   if(!Number.isFinite(age)||age<0||age>9)throw Error('stale/future '+last);
+   if(old.series[key]?.length&&last<old.series[key].at(-1).date)throw Error('provider series is older than published');
+   const merged=new Map((old.series[key]||[]).map(p=>[p.date,p.close]));
+   for(const bar of normalized)merged.set(bar.date,bar.close);
+   next.series[key]=[...merged.entries()].map(([date,close])=>({date,close})).sort((a,b)=>a.date.localeCompare(b.date)).slice(-1000);
+  }catch(e){errors.push(symbol+': '+e.message);}
+ }
+ const aligned=['zijinA','zijinH'].map(k=>compareHistory(next,{stock:k,period:'all'}));
+ const usable=aligned.some(c=>c.enough&&c.commonCount>=minOverlap);
+ if(!usable)return {updated:false,history:old,errors:[...errors,'No stock has >= '+minOverlap+' valid gold-matched trading dates']};
+ const changed=HISTORY_KEYS.some(k=>JSON.stringify(old.series[k])!==JSON.stringify(next.series[k]));
+ if(!changed)return {updated:false,history:old,errors};
+ next.provider='Twelve Data · licensed daily EOD';
+ next.status='licensed-eod';
+ next.updatedAt=checkDay;
+ next.notes='每日收盘数据，不复权，黄金XAU/USD为美元/盎司；A股人民币，H股港元。仅在确认行情公开展示授权后发布。';
+ return {updated:true,history:next,errors};
+}

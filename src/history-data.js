@@ -99,12 +99,20 @@ export function historyFromCsv(csv){
  const rows=parseCsvRecords(csv.trim().replace(/^\uFEFF/,''));
  if(rows.length<3)throw Error('至少需要表头和两个交易日');
  const names=rows[0].map(v=>v.trim().toLowerCase());
- const columns={date:names.indexOf('date'),gold:names.indexOf('gold'),zijinA:names.indexOf('zijin_a'),zijinH:names.indexOf('zijin_h')};
+ const columns={date:names.indexOf('date'),gold:names.indexOf('gold'),zijinA:names.indexOf('zijin_a'),zijinH:names.indexOf('zijin_h'),instrument:names.indexOf('gold_instrument'),unit:names.indexOf('gold_unit')};
  if(columns.date<0||columns.gold<0||(columns.zijinA<0&&columns.zijinH<0))throw Error('表头必须包含 date,gold,zijin_a,zijin_h（最后两列可选一列）');
  const series={gold:[],zijinA:[],zijinH:[]};
+ const metadata=new Set();
  for(const row of rows.slice(1)){
   const date=row[columns.date]?.trim();
   if(!acceptableDate(date))throw Error('无效日期 '+date);
+  if(columns.instrument>=0||columns.unit>=0){
+   if(columns.instrument<0||columns.unit<0)throw Error('金价需同时标明 gold_instrument、gold_unit');
+   const instrument=(row[columns.instrument]||'').trim();
+   const unit=(row[columns.unit]||'').trim();
+   if(!instrument||!unit)throw Error(date+' 缺少黄金品种及单位');
+   metadata.add(instrument+'|'+unit);
+  }
   for(const key of HISTORY_KEYS){
    const col=columns[key],str=col>=0?row[col]?.trim():'';
    if(!str)continue;
@@ -113,7 +121,11 @@ export function historyFromCsv(csv){
    series[key].push([date,close]);
   }
  }
- return normalizeHistory({schemaVersion:1,updatedAt:new Date().toISOString().slice(0,10),provider:'用户导入 CSV（来源未经独立核验）',status:'imported',notes:'黄金单位USD/oz；A股为CNY，H股为HKD；日期必须是当地同一日。',series});
+ if(metadata.size>1)throw Error('CSV不能混合不同的黄金价格品种或计价单位');
+ const pair=metadata.size?[...metadata][0]:'XAU/USD|USD/oz';
+ if(!['SGE Au99.99|CNY/g','XAU/USD|USD/oz'].includes(pair))throw Error('黄金价格单位或品种不支持：'+pair);
+ const [goldInstrument,goldUnit]=pair.split('|');
+ return normalizeHistory({schemaVersion:1,updatedAt:new Date().toISOString().slice(0,10),provider:'用户导入 CSV（来源未经独立核验）',status:'imported',goldInstrument,goldUnit,notes:'黄金'+goldInstrument+'，单位'+goldUnit+'；A股CNY，H股HKD。不复权日期按同日对齐。',series});
 }
 
 /** Convert licensed Twelve Data daily API responses into strictly dated daily close series.

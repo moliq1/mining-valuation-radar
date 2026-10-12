@@ -88,8 +88,8 @@ export function repaintHistory(container){
  <div class="hist-dimension">黄金 <b>${instrumentName('gold',view)}（${instrumentUnit('gold',view)}）</b>，A股 <b>人民币/股</b>，H股 <b>港元/股</b>。归一化显示各自相对回报，不剔除汇率波动。</div>
  ${src.status==='unconfigured'?'<div class="hist-warning">⚠ 未配置获授权的历史数据源，网页不会生成虚假的走势图。</div>':''}
  ${src.status==='imported'?'<div class="hist-warning">⚠ 用户CSV并未由服务端核验准确性。</div>':''}</div></div>
- <div class="panel hist-import"><div><h3>导入真实历史数据 / 管理行情源</h3><p>CSV表头：<code>date,gold,zijin_a,zijin_h</code>；缺失价格留空，禁止估算或跨节假日填补。也可设置已有的 Twelve Data 许可，同步服务会自动产生历史行情文件。</p></div><div class="hist-import-buttons"><button class="button" data-hist-template>↓ CSV模板</button><label for="hist-file" class="button primary">↑ 导入行情CSV</label><input type="file" accept=".csv,text/csv" id="hist-file" hidden>${importedHistory?'<button class="button" data-hist-clear>清除手动导入</button>':''}</div></div>
- <p class="hist-disclaimer">采用<strong>不复权收盘价</strong>（不含分红再投资），按相同日历日期交集计算同期涨幅与 Pearson 相关系数；不跨日插值。黄金以美元计价，A/H股票受人民币/港元汇率影响。相关系数不代表因果关系或未来收益。</p>`;
+ <div class="panel hist-import"><div><h3>导入真实历史数据 / 管理行情源</h3><p>CSV表头：<code>date,gold,zijin_a,zijin_h,gold_instrument,gold_unit</code>；上金所黄金请填 <code>SGE Au99.99,CNY/g</code>，国际黄金填 <code>XAU/USD,USD/oz</code>。Actions 的只读研究包可以直接导入，缺失价格留空。</p></div><div class="hist-import-buttons"><button class="button" data-hist-template>↓ CSV模板</button><label for="hist-file" class="button primary">↑ 导入 CSV / JSON</label><input type="file" accept=".csv,.json,text/csv,application/json" id="hist-file" hidden>${importedHistory?'<button class="button" data-hist-clear>清除手动导入</button>':''}</div></div>
+ <p class="hist-disclaimer">采用<strong>不复权收盘价</strong>（不含分红再投资），按相同日历日期交集计算同期涨幅与 Pearson 相关系数；不跨日插值。黄金单位会依 Au99.99 或 XAU/USD 基准切换，A/H股票分别为人民币与港元，收益对比不自动消除汇率影响。相关系数不代表因果关系或未来收益。</p>`;
  bindHover(container,view);
 }
 
@@ -109,7 +109,7 @@ export async function mountHistoryPanel(container){
   if(el.dataset.histStock){selectedStock=el.dataset.histStock;if(selectedStock==='both')selectedMode='indexed';repaintHistory(container);}
   else if(el.dataset.histPeriod){selectedPeriod=el.dataset.histPeriod;repaintHistory(container);}
   else if(el.dataset.histMode){selectedMode=el.dataset.histMode;if(selectedMode==='dual'&&selectedStock==='both')selectedStock='zijinA';repaintHistory(container);}
-  else if(el.hasAttribute('data-hist-template'))downloadHistoryText('mining-gold-zijin-template.csv','date,gold,zijin_a,zijin_h\n');
+  else if(el.hasAttribute('data-hist-template'))downloadHistoryText('mining-gold-zijin-template.csv','date,gold,zijin_a,zijin_h,gold_instrument,gold_unit\n');
   else if(el.hasAttribute('data-hist-clear')){importedHistory=null;try{localStorage.removeItem('ore-history-import-v1')}catch{}repaintHistory(container);}
  });
  container.addEventListener('change',async event=>{
@@ -117,7 +117,7 @@ export async function mountHistoryPanel(container){
   const file=event.target.files?.[0];if(!file)return;
   if(file.size>1500000){window.alert('CSV不得超过1.5MB');return;}
   try{
-   importedHistory=historyFromCsv(await file.text());
+   importedHistory=file.name.toLowerCase().endsWith('.json')?normalizeHistory(JSON.parse(await file.text())):historyFromCsv(await file.text());
    try{localStorage.setItem('ore-history-import-v1',JSON.stringify(importedHistory))}catch{}
    repaintHistory(container);
   }catch(error){window.alert('数据导入失败：'+error.message);}

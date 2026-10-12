@@ -83,7 +83,7 @@ export function repaintHistory(container){
  const allKeys=['gold','zijinA','zijinH'];
  const counts=allKeys.map(k=>`${instrumentName(k,view)}：${src.series[k]?.length||0}条`).join(' · ');
  container.innerHTML=`<div class="hist-intro"><div><div class="eyebrow">MARKET VISUALIZATION / EOD RESEARCH</div><h2>黄金价格 × 紫金矿业 · 走势图</h2><p>直观看金价变化与紫金 A/H 股价的同步性、强弱差及时间错位。</p></div><span class="hist-state">${src.status==='unconfigured'?'行情源尚未配置':src.status==='imported'?'用户导入':'历史收盘数据 · 非实时'}</span></div>
- ${controls}<div class="panel hist-chart-panel"><div class="hist-chart-top"><div><h3>黄金 XAU/USD vs 紫金矿业</h3><p>${view.enough?view.start+' 至 '+view.end+' · '+view.commonCount+'个共有交易日':'等待足够的真实历史行情'}</p></div><div class="hist-legends">${legend}</div></div>${makeChart(view)}${metrics}<div class="hist-correlations">${corr}</div>
+ ${controls}<div class="panel hist-chart-panel"><div class="hist-chart-top"><div><h3>${instrumentName('gold',view)} vs 紫金矿业</h3><p>${view.enough?view.start+' 至 '+view.end+' · '+view.commonCount+'个共有交易日':'等待足够的真实历史行情'}</p></div><div class="hist-legends">${legend}</div></div>${makeChart(view)}${metrics}<div class="hist-correlations">${corr}</div>
  <div class="hist-source"><div><strong>源：</strong>${escapeHtml(src.provider||'未注明')}${src.updatedAt?' · 更新 '+escapeHtml(src.updatedAt):''} · ${escapeHtml(counts)}</div>
  <div class="hist-dimension">黄金 <b>${instrumentName('gold',view)}（${instrumentUnit('gold',view)}）</b>，A股 <b>人民币/股</b>，H股 <b>港元/股</b>。归一化显示各自相对回报，不剔除汇率波动。</div>
  ${src.status==='unconfigured'?'<div class="hist-warning">⚠ 未配置获授权的历史数据源，网页不会生成虚假的走势图。</div>':''}

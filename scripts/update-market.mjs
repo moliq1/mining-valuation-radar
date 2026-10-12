@@ -6,9 +6,11 @@
  */
 import {readFile,writeFile} from 'node:fs/promises';
 import {applyMarketData,marketSymbol} from '../src/market-sync.js';
+import {providerHistory} from '../src/history-data.js';
 const dryRun=process.argv.includes('--dry-run');
 const fixtureFlag=process.argv.indexOf('--fixture');
 const snapshotPath=new URL('../data/snapshot.json',import.meta.url);
+const historyPath=new URL('../data/market-history.json',import.meta.url);
 const snapshot=JSON.parse(await readFile(snapshotPath,'utf8'));
 const license=process.env.MARKET_DATA_PUBLICATION_AUTHORIZED==='true';
 const apiKey=process.env.TWELVE_DATA_API_KEY;
@@ -25,7 +27,7 @@ if(fixtureFlag>=0){
                  ['HKD/CNY',{symbol:'HKD/CNY'}]];
   for(const [ticker,config] of symbols){
     const url=new URL('https://api.twelvedata.com/time_series');
-    const entries={...config,interval:'1day',outputsize:'10',format:'JSON',adjust:'none',apikey:apiKey};
+    const entries={...config,interval:'1day',outputsize:['601899.SH','02899.HK','XAU/USD'].includes(ticker)?'400':'10',format:'JSON',adjust:'none',apikey:apiKey};
     for(const [k,v] of Object.entries(entries))url.searchParams.set(k,v);
     try{
       const res=await fetch(url,{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(14000)});
@@ -39,10 +41,13 @@ if(fixtureFlag>=0){
     await new Promise(r=>setTimeout(r,8200));
   }
 }
+const historyBefore=JSON.parse(await readFile(historyPath,'utf8'));
+const historical=providerHistory(quotes,historyBefore,{checkedAt:new Date().toISOString(),minOverlap:10});
+console.log('History publish:',historical.updated?'validated historical series ready':'not updated',historical.errors);
 const {snapshot:updated,report}=applyMarketData(snapshot,quotes,{checkedAt:new Date().toISOString()});
 console.log('EOD sync summary:',JSON.stringify(report,null,2));
-if(report.updated.length===0){console.error('No valid stock quotes. Snapshot not overwritten.');process.exitCode=1;}
+if(report.updated.length===0 && !historical.updated){console.error('No valid stock quotes or licensed historical charts; existing data left intact.');process.exitCode=1;}
 else if(!dryRun){
-  await writeFile(snapshotPath,JSON.stringify(updated,null,2)+'\n','utf8');
-  console.log('Updated snapshot with',report.updated.length,'of',snapshot.stocks.length,'quote(s).');
+  if(report.updated.length>0){await writeFile(snapshotPath,JSON.stringify(updated,null,2)+'\n','utf8');console.log('Updated snapshot with',report.updated.length,'quotes.');}
+  if(historical.updated){await writeFile(historyPath,JSON.stringify(historical.history,null,2)+'\n','utf8');console.log('Updated gold and Zijin historical series.');}
 }else console.log('DRY RUN: no files written.');

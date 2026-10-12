@@ -1,11 +1,12 @@
 import {CASES,CASE_LABEL,METAL_LABEL,companyValue,stockMetrics,stockStatus,ahPairs,validateSnapshot,finite} from './model.js';
 import {reconcileSnapshot} from './market-sync.js';
+import {mountHistoryPanel} from './history-chart.js';
 const BASE_URL=new URL('../data/snapshot.json',import.meta.url);
 
 const LS='ore-mining-radar-v1';
 const FEED_NOTE='历史行情/收盘数据可能延迟，且不同交易所休市日不一致；没有配置获授权的行情源时，网页不会自动更新。';
 
-const navs=[['overview','◫','研究总览'],['valuation','▦','估值矩阵'],['scenario','◈','情景实验室'],['spread','⇆','A / H 比价'],['signals','⚑','错杀雷达'],['sources','≡','数据与来源']];
+const navs=[['overview','◫','研究总览'],['history','◩','走势图'],['valuation','▦','估值矩阵'],['scenario','◈','情景实验室'],['spread','⇆','A / H 比价'],['signals','⚑','错杀雷达'],['sources','≡','数据与来源']];
 const app=document.getElementById('app');
 const state={data:null,tab:location.hash.replace('#','')||'overview',labCompany:'zijin',labCase:'base',selected:'01787.HK',board:'all',search:'',message:''};
 const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -36,7 +37,7 @@ function shell(){
  <footer class="footer-note">ORE Radar © 2026　/　仅用于投研假设和风险筛选。${esc(note)} 真实交易前请复核所有输入、披露公告及交易费用。</footer>
  </main></div>`;
 }
-function page(){switch(state.tab){case'valuation':return valuationPage();case'scenario':return scenarioPage();case'spread':return spreadPage();case'signals':return signalsPage();case'sources':return sourcesPage();default:return overviewPage();}}
+function page(){switch(state.tab){case'history':return '<div id="history-workspace"></div>';case'valuation':return valuationPage();case'scenario':return scenarioPage();case'spread':return spreadPage();case'signals':return signalsPage();case'sources':return sourcesPage();default:return overviewPage();}}
 function overviewPage(){
  const rs=rows(), discounts=rs.filter(x=>finite(x.m.margin)&&x.m.margin>=0.25),watch=rs.filter(x=>x.status.code==='watch');
  const highest=[...rs].sort((a,b)=>(b.m.margin??-Infinity)-(a.m.margin??-Infinity));
@@ -119,7 +120,7 @@ async function refreshRemote(){
  state.data=merged;save();toast('已读取服务器收盘快照；保留本地估值情景与 PE 假设；新收盘价的公告核验已重置为待确认。');
  }catch(e){toast('更新快照失败：'+e.message);}
 }
-function render(){document.title=`${navs.find(n=>n[0]===state.tab)?.[2]||'研究总览'} | ORE RADAR`;app.className='';app.innerHTML=shell();}
+function render(){document.title=`${navs.find(n=>n[0]===state.tab)?.[2]||'研究总览'} | ORE RADAR`;app.className='';app.innerHTML=shell();if(state.tab==='history')mountHistoryPanel(app.querySelector('#history-workspace'));}
 function toast(s){state.message=s;render();}
 function triggerDownload(data,name,mime){const blob=new Blob([data],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function changed(target) {

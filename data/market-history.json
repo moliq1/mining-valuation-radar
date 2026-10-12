@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": null,
+  "provider": "尚未配置已获授权的历史收盘行情源",
+  "status": "unconfigured",
+  "notes": "不包含模拟/推断行情。配置TWELVE_DATA_API_KEY与MARKET_DATA_PUBLICATION_AUTHORIZED才会由定时任务更新，或在网页中导入用户自己的CSV。",
+  "series": {
+    "gold": [],
+    "zijinA": [],
+    "zijinH": []
+  }
+}

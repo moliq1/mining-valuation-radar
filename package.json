@@ -6,7 +6,8 @@
   "description": "金银铜矿业 A/H 动态估值雷达",
   "scripts": {
     "dev": "python3 -m http.server 4173 --bind 127.0.0.1",
-    "test": "node --test"
+    "test": "node --test",
+    "check": "node --check src/app.js && node --check src/model.js && node --check src/zijin-forecast.js && node --check src/forecast-ui.js"
   },
   "engines": {
     "node": ">=18"

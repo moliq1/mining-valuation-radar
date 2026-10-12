@@ -1,5 +1,8 @@
 """Unit tests use synthetic quotes only; no network or third-party API keys."""
 import copy
+import csv
+import tempfile
+from unittest.mock import patch
 import datetime as dt
 import importlib.util
 from pathlib import Path
@@ -70,6 +73,75 @@ class FreeMarketTest(unittest.TestCase):
         self.assertEqual(logs, ["primary", "backup"])
         self.assertTrue(warnings)
         self.assertEqual(result[-1][0], TODAY.isoformat())
+
+    def test_cmoc_tertiary_fallback_only_for_cmoc(self):
+        attempts = []
+        def bad_primary(*args):
+            attempts.append("akshare")
+            raise ValueError("disconnected")
+        def bad_secondary(*args):
+            attempts.append("efinance")
+            raise ValueError("disconnected")
+        def working_third(*args):
+            attempts.append("third")
+            return bars(15)
+        for code, board in [("603993", "A"), ("03993", "H")]:
+            attempts.clear()
+            data, source, warnings = fm.pick_stock_history(
+                code, board, "20260901", "20261012", TODAY,
+                bad_primary, bad_secondary, working_third,
+            )
+            self.assertEqual(attempts, ["akshare", "efinance", "third"])
+            self.assertEqual(source, "BaoStock" if board == "A" else "yfinance")
+            self.assertEqual(data[-1][0], TODAY.isoformat())
+            self.assertEqual(len(warnings), 2)
+        attempts.clear()
+        with self.assertRaises(ValueError):
+            fm.pick_stock_history(
+                "601899", "A", "20260901", "20261012", TODAY,
+                bad_primary, bad_secondary, working_third,
+            )
+        self.assertEqual(attempts, ["akshare", "efinance"])
+
+    def test_third_source_fails_closed_if_stale(self):
+        def fail(*args):
+            raise RuntimeError("blocked")
+        def stale(*args):
+            return [[(TODAY - dt.timedelta(days=23-i)).isoformat(), float(i+20)] for i in range(15)]
+        with self.assertRaisesRegex(ValueError, "stale"):
+            fm.pick_stock_history(
+                "03993", "H", "20260901", "20261012", TODAY,
+                fail, fail, stale,
+            )
+
+    def test_csv_artifact_gold_identity_and_sparse_calendar(self):
+        history = {
+            "schemaVersion": 1, "goldInstrument": "SGE Au99.99",
+            "goldUnit": "CNY/g",
+            "series": {
+                "gold": [["2026-10-12", 902.9], ["2026-10-09", 895.0]],
+                "zijinA": [["2026-10-09", 30.0], ["2026-10-12", 30.22]],
+                "zijinH": [["2026-10-12", 32.58]],
+            },
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "market-history.csv"
+            n = fm.history_to_csv(history, target)
+            with target.open(encoding="utf-8-sig", newline="") as file:
+                records = list(csv.DictReader(file))
+            self.assertEqual(n, 2)
+            self.assertEqual(records[0]["gold_unit"], "CNY/g")
+            self.assertEqual(records[0]["gold_instrument"], "SGE Au99.99")
+            self.assertEqual(records[0]["zijin_h"], "")
+            self.assertEqual(records[1]["zijin_h"], "32.58")
+
+    def test_csv_artifact_rejects_unknown_gold_units(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaises(ValueError):
+                fm.history_to_csv({
+                    "series": {"gold": [["2026-10-12", 900]]},
+                    "goldInstrument": "XAU/USD", "goldUnit": "CNY/g",
+                }, Path(folder) / "wrong.csv")
 
     def test_stale_rejected(self):
         old = [[(TODAY - dt.timedelta(days=20-i)).isoformat(), 20+i] for i in range(6)]

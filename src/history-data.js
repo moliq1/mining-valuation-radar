@@ -124,6 +124,7 @@ export function providerHistory(quotes,current,{checkedAt=new Date().toISOString
  const old=normalizeHistory(current);
  const next=structuredClone(old);
  const errors=[];
+ let acceptedGold=false;
  const checkDay=checkedAt.slice(0,10);
  for(const [key,[symbol,currency]] of Object.entries(mapping)){
   const payload=quotes[symbol];
@@ -142,6 +143,7 @@ export function providerHistory(quotes,current,{checkedAt=new Date().toISOString
    const merged=new Map((old.series[key]||[]).map(p=>[p.date,p.close]));
    for(const bar of normalized)merged.set(bar.date,bar.close);
    next.series[key]=[...merged.entries()].map(([date,close])=>({date,close})).sort((a,b)=>a.date.localeCompare(b.date)).slice(-1000);
+   if(key==='gold')acceptedGold=true;
   }catch(e){errors.push(symbol+': '+e.message);}
  }
  const aligned=['zijinA','zijinH'].map(k=>compareHistory(next,{stock:k,period:'all'}));
@@ -149,7 +151,7 @@ export function providerHistory(quotes,current,{checkedAt=new Date().toISOString
  if(!usable)return {updated:false,history:old,errors:[...errors,'No stock has >= '+minOverlap+' valid gold-matched trading dates']};
  const changed=HISTORY_KEYS.some(k=>JSON.stringify(old.series[k])!==JSON.stringify(next.series[k]));
  if(!changed)return {updated:false,history:old,errors};
- if(quotes['XAU/USD']?.values?.length && next.series.gold?.length){next.goldInstrument='XAU/USD';next.goldUnit='USD/oz';}
+ if(acceptedGold){next.goldInstrument='XAU/USD';next.goldUnit='USD/oz';}
  next.provider='Twelve Data · licensed daily EOD';
  next.status='licensed-eod';
  next.updatedAt=checkDay;

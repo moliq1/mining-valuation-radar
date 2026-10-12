@@ -73,3 +73,19 @@ test('publisher rejects wrong currency and keeps unpublished history empty',()=>
  assert.equal(r.updated,false);
  assert.equal(r.history.series.gold.length,0);
 });
+
+test('Shanghai Au99.99 remains CNY/g and is never relabeled as international XAU/USD',()=>{
+ const data=fixture();
+ data.goldInstrument='SGE Au99.99';
+ data.goldUnit='CNY/g';
+ const r=compareHistory(data,{stock:'zijinA',period:'all'});
+ assert.equal(r.goldInstrument,'SGE Au99.99');
+ assert.equal(r.goldUnit,'CNY/g');
+ const quotes={
+  'XAU/USD':providerBars('XAU/USD','USD'),
+  '601899.SH':providerBars('601899.SH','CNY')
+ };
+ const next=providerHistory(quotes,data,{checkedAt:'2026-09-20T18:00:00Z',minOverlap:10});
+ assert.equal(next.history.goldInstrument,'SGE Au99.99');
+ assert.equal(next.history.goldUnit,'CNY/g');
+});

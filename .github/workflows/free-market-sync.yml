@@ -36,7 +36,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry_run }}" == "true" ]]; then
             echo "mode=dry-run" >> "$GITHUB_OUTPUT"
-            echo "Read-only dry-run: source prices will not be pushed to Pages." >> "$GITHUB_STEP_SUMMARY"
+            echo "Read-only dry-run: source prices will not be pushed to Pages. An optional 2-day workflow artifact will be downloadable by users with repository Actions access; on public repositories do NOT regard this as confidential storage." >> "$GITHUB_STEP_SUMMARY"
           elif [[ "$MARKET_DATA_PUBLICATION_AUTHORIZED" == "true" && "$FREE_DATA_REDISPLAY_RIGHTS_VERIFIED" == "true" && "$FREE_MARKET_SYNC_ENABLED" == "true" ]]; then
             echo "mode=publish" >> "$GITHUB_OUTPUT"
           else
@@ -51,7 +51,7 @@ jobs:
         if: steps.gate.outputs.mode != 'skip'
         run: |
           python -m pip install --upgrade pip
-          pip install "akshare>=1.16,<3" "efinance>=0.5,<1" "pandas>=2,<3"
+          pip install "akshare>=1.16,<3" "efinance>=0.5,<1" "pandas>=2,<3" "baostock>=0.8,<1" "yfinance>=0.2,<1"
       - name: Verify Python parsers without network
         if: steps.gate.outputs.mode != 'skip'
         run: python -m unittest discover -s tests -p 'test_*.py' -v
@@ -61,8 +61,20 @@ jobs:
           if [[ "${{ steps.gate.outputs.mode }}" == "publish" ]]; then
             python scripts/free_market_sync.py --publish
           else
-            python scripts/free_market_sync.py
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              python scripts/free_market_sync.py --output-dir "$RUNNER_TEMP/ore-research-data"
+            else
+              python scripts/free_market_sync.py
+            fi
           fi
+      - name: Upload optional dry-run research download
+        if: github.event_name == 'workflow_dispatch' && steps.gate.outputs.mode == 'dry-run'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ore-eod-research-${{ github.run_id }}
+          path: ${{ runner.temp }}/ore-research-data/
+          retention-days: 2
+          if-no-files-found: warn
       - name: Revalidate JS charts and valuation rules
         if: steps.gate.outputs.mode == 'publish'
         run: |

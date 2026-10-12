@@ -9,6 +9,8 @@ const percent=v=>typeof v==='number'&&Number.isFinite(v)?(v>0?'+':'')+(v*100).to
 const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const when=date=>Date.parse(date+'T00:00:00Z');
 const priceColors=PALETTE;
+const instrumentName=(key,view)=>key==='gold'?(view.goldInstrument==='SGE Au99.99'?'上金所 Au99.99':'国际现货黄金 XAU/USD'):HISTORY_NAMES[key];
+const instrumentUnit=(key,view)=>key==='gold'?(view.goldUnit||'USD/oz'):HISTORY_UNITS[key];
 
 export function makeChart(result){
  if(!result.enough)return `<div class="hist-empty"><div class="hist-empty-icon">⌁</div><b>暂无可用的真实黄金—紫金矿业历史走势</b><p>${escapeHtml(result.reason)} 请导入包含实际日期和价格的CSV，或配置已获许可的收盘数据源。这里不会生成模拟价格。</p></div>`;
@@ -33,7 +35,7 @@ export function makeChart(result){
   const d=result.series[k].map((p,i)=>`${i?'L':'M'}${dx(p.date).toFixed(2)},${y(p.value,axis).toFixed(2)}`).join(' ');
   return `<path d="${d}" fill="none" stroke="${PALETTE[k]}" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
  }).join('');
- return `<div class="hist-svgbox"><svg class="hist-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="金价和紫金矿业股票比较走势图，${result.mode==='indexed'?'共同基准100':'双纵轴价格'}；${result.start}至${result.end}"><text x="${L}" y="17" class="hist-axis-title">${result.mode==='indexed'?'共同起点＝100':'左轴 黄金 USD/oz'}</text>${yRight?`<text x="${W-R}" y="17" text-anchor="end" class="hist-axis-title">右轴 ${HISTORY_UNITS[result.stock]}/股</text>`:''}${lines}${paths}<line data-crosshair x1="0" x2="0" y1="${T}" y2="${T+PH}" stroke="#8ca1b0" stroke-dasharray="3 4" visibility="hidden"/><rect data-hist-hover x="${L}" y="${T}" width="${PW}" height="${PH}" fill="transparent" style="cursor:crosshair"/></svg><div class="hist-tooltip" hidden></div></div>`;
+ return `<div class="hist-svgbox"><svg class="hist-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="金价和紫金矿业股票比较走势图，${result.mode==='indexed'?'共同基准100':'双纵轴价格'}；${result.start}至${result.end}"><text x="${L}" y="17" class="hist-axis-title">${result.mode==='indexed'?'共同起点＝100':'左轴 ${instrumentName('gold',result)} ${instrumentUnit('gold',result)}'}</text>${yRight?`<text x="${W-R}" y="17" text-anchor="end" class="hist-axis-title">右轴 ${HISTORY_UNITS[result.stock]}/股</text>`:''}${lines}${paths}<line data-crosshair x1="0" x2="0" y1="${T}" y2="${T+PH}" stroke="#8ca1b0" stroke-dasharray="3 4" visibility="hidden"/><rect data-hist-hover x="${L}" y="${T}" width="${PW}" height="${PH}" fill="transparent" style="cursor:crosshair"/></svg><div class="hist-tooltip" hidden></div></div>`;
 }
 
 export function downloadHistoryText(filename,text){
@@ -59,7 +61,7 @@ export function bindHover(container,view){
    // Both chart modes derive raw price from the same common-date values.
    const raw=view.mode==='indexed'?graphVal/100*view.baseline[k]:graphVal;
    const growth=raw/view.baseline[k]-1;
-   return `<div class="hist-tip-row"><span><i style="background:${PALETTE[k]}"></i>${escapeHtml(HISTORY_NAMES[k])}</span><b>${number(raw)} ${HISTORY_UNITS[k]} · ${percent(growth)}</b></div>`;
+   return `<div class="hist-tip-row"><span><i style="background:${PALETTE[k]}"></i>${escapeHtml(instrumentName(k,view))}</span><b>${number(raw)} ${instrumentUnit(k,view)} · ${percent(growth)}</b></div>`;
   }).join('');
   tip.innerHTML=`<strong>${date}</strong>${values}`;tip.hidden=false;
   tip.style.left=Math.min(r.width-240,Math.max(8,cross/1000*r.width+12))+'px';
@@ -75,15 +77,15 @@ export function repaintHistory(container){
  const controls=`<div class="panel hist-toolbar"><div class="hist-control"><label>比较对象</label><div class="hist-togglebar">${[['zijinA','紫金 A'],['zijinH','紫金 H'],['both','A / H 同图']].map(([k,n])=>choose('hist-stock',k,n,selectedStock)).join('')}</div></div>
  <div class="hist-control"><label>时间跨度</label><div class="hist-togglebar">${PERIODS.map(k=>choose('hist-period',k,k.toUpperCase(),selectedPeriod)).join('')}</div></div>
  <div class="hist-control"><label>坐标方式</label><div class="hist-togglebar">${[['indexed','起点=100'],['dual','双价格轴']].map(([k,n])=>choose('hist-mode',k,n,selectedMode)).join('')}</div></div></div>`;
- const legend=view.wanted.map(k=>`<span><i style="background:${PALETTE[k]}"></i>${escapeHtml(HISTORY_NAMES[k])}</span>`).join('');
- const metrics=view.enough?`<div class="hist-stats">${view.wanted.map(k=>`<div class="hist-stat"><span class="hist-stat-title"><i style="background:${PALETTE[k]}"></i>${escapeHtml(HISTORY_NAMES[k])}</span><strong class="${view.totalReturns[k]>=0?'positive':'negative'}">${percent(view.totalReturns[k])}</strong><small>${view.start} → ${view.end}</small></div>`).join('')}</div>`:'';
- const corr=view.enough?view.wanted.filter(k=>k!=='gold').map(k=>`<div class="hist-corr">${escapeHtml(HISTORY_NAMES[k])} vs 金价，交集交易日收益 Pearson 相关系数：<strong>${number(view.correlations[k],3)}</strong></div>`).join(''):'';
+ const legend=view.wanted.map(k=>`<span><i style="background:${PALETTE[k]}"></i>${escapeHtml(instrumentName(k,view))}</span>`).join('');
+ const metrics=view.enough?`<div class="hist-stats">${view.wanted.map(k=>`<div class="hist-stat"><span class="hist-stat-title"><i style="background:${PALETTE[k]}"></i>${escapeHtml(instrumentName(k,view))}</span><strong class="${view.totalReturns[k]>=0?'positive':'negative'}">${percent(view.totalReturns[k])}</strong><small>${view.start} → ${view.end}</small></div>`).join('')}</div>`:'';
+ const corr=view.enough?view.wanted.filter(k=>k!=='gold').map(k=>`<div class="hist-corr">${escapeHtml(instrumentName(k,view))} vs 金价，交集交易日收益 Pearson 相关系数：<strong>${number(view.correlations[k],3)}</strong></div>`).join(''):'';
  const allKeys=['gold','zijinA','zijinH'];
- const counts=allKeys.map(k=>`${HISTORY_NAMES[k]}：${src.series[k]?.length||0}条`).join(' · ');
+ const counts=allKeys.map(k=>`${instrumentName(k,view)}：${src.series[k]?.length||0}条`).join(' · ');
  container.innerHTML=`<div class="hist-intro"><div><div class="eyebrow">MARKET VISUALIZATION / EOD RESEARCH</div><h2>黄金价格 × 紫金矿业 · 走势图</h2><p>直观看金价变化与紫金 A/H 股价的同步性、强弱差及时间错位。</p></div><span class="hist-state">${src.status==='unconfigured'?'行情源尚未配置':src.status==='imported'?'用户导入':'历史收盘数据 · 非实时'}</span></div>
  ${controls}<div class="panel hist-chart-panel"><div class="hist-chart-top"><div><h3>黄金 XAU/USD vs 紫金矿业</h3><p>${view.enough?view.start+' 至 '+view.end+' · '+view.commonCount+'个共有交易日':'等待足够的真实历史行情'}</p></div><div class="hist-legends">${legend}</div></div>${makeChart(view)}${metrics}<div class="hist-correlations">${corr}</div>
  <div class="hist-source"><div><strong>源：</strong>${escapeHtml(src.provider||'未注明')}${src.updatedAt?' · 更新 '+escapeHtml(src.updatedAt):''} · ${escapeHtml(counts)}</div>
- <div class="hist-dimension">黄金 <b>美元/盎司</b>，A股 <b>人民币/股</b>，H股 <b>港元/股</b>。归一化显示各自相对回报，不剔除汇率波动。</div>
+ <div class="hist-dimension">黄金 <b>${instrumentName('gold',view)}（${instrumentUnit('gold',view)}）</b>，A股 <b>人民币/股</b>，H股 <b>港元/股</b>。归一化显示各自相对回报，不剔除汇率波动。</div>
  ${src.status==='unconfigured'?'<div class="hist-warning">⚠ 未配置获授权的历史数据源，网页不会生成虚假的走势图。</div>':''}
  ${src.status==='imported'?'<div class="hist-warning">⚠ 用户CSV并未由服务端核验准确性。</div>':''}</div></div>
  <div class="panel hist-import"><div><h3>导入真实历史数据 / 管理行情源</h3><p>CSV表头：<code>date,gold,zijin_a,zijin_h</code>；缺失价格留空，禁止估算或跨节假日填补。也可设置已有的 Twelve Data 许可，同步服务会自动产生历史行情文件。</p></div><div class="hist-import-buttons"><button class="button" data-hist-template>↓ CSV模板</button><label for="hist-file" class="button primary">↑ 导入行情CSV</label><input type="file" accept=".csv,text/csv" id="hist-file" hidden>${importedHistory?'<button class="button" data-hist-clear>清除手动导入</button>':''}</div></div>

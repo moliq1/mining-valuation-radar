@@ -107,7 +107,7 @@ class FreeMarketTest(unittest.TestCase):
         def fail(*args):
             raise RuntimeError("blocked")
         def stale(*args):
-            return [[(TODAY - dt.timedelta(days=23-i)).isoformat(), float(i+20)] for i in range(15)]
+            return [[(TODAY - dt.timedelta(days=40-i)).isoformat(), float(i+20)] for i in range(15)]
         with self.assertRaisesRegex(ValueError, "stale"):
             fm.pick_stock_history(
                 "03993", "H", "20260901", "20261012", TODAY,

@@ -72,7 +72,7 @@ class FreeMarketTest(unittest.TestCase):
         self.assertEqual(result[-1][0], TODAY.isoformat())
 
     def test_stale_rejected(self):
-        old = [[day, 20+i] for i, day in enumerate(DAYS[:6])]
+        old = [[(TODAY - dt.timedelta(days=20-i)).isoformat(), 20+i] for i in range(6)]
         with self.assertRaises(ValueError):
             fm.recent_valid(old, TODAY)
 

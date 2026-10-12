@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Free-market EOD research collector for ORE Radar.
 
-Uses AKShare (primary), efinance (backup for stocks), SGE Au99.99 for gold.
+Uses AKShare (primary), efinance (secondary), BaoStock A / Yahoo H (CMOC tertiary), and SGE Au99.99 for gold.
 No API key. No data redistribution or public Pages publication without explicit
 rights confirmation. An absent/failed provider never causes synthetic prices.
 """
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import csv
 import datetime as dt
 import json
 import math
@@ -107,6 +108,70 @@ def fetch_efinance(code, board, start, end):
     return parse_rows(rows, code=code)
 
 
+def fetch_baostock(code, board, start, end):
+    """Independent A-share backup: BaoStock daily unadjusted bars (adjustflag=3)."""
+    if board != "A":
+        raise ValueError("BaoStock only covers mainland A shares")
+    import baostock as bs
+    market = "sh" if code.startswith(("60", "68")) else "sz"
+    session = bs.login()
+    if session.error_code != "0":
+        raise ValueError("BaoStock login failed: " + str(session.error_msg))
+    try:
+        result = bs.query_history_k_data_plus(
+            f"{market}.{code}", "date,code,close,tradestatus,adjustflag",
+            start_date=dt.datetime.strptime(start, "%Y%m%d").strftime("%Y-%m-%d"),
+            end_date=dt.datetime.strptime(end, "%Y%m%d").strftime("%Y-%m-%d"),
+            frequency="d", adjustflag="3",
+        )
+        if result.error_code != "0":
+            raise ValueError("BaoStock query failed: " + str(result.error_msg))
+        rows = []
+        while result.next():
+            row = dict(zip(result.fields, result.get_row_data()))
+            if row.get("tradestatus") != "1" or row.get("adjustflag") != "3":
+                continue
+            if row.get("code") != f"{market}.{code}":
+                raise ValueError("BaoStock unexpected ticker")
+            rows.append({"date": row["date"], "close": row["close"]})
+        return parse_rows(rows)
+    finally:
+        bs.logout()
+
+
+def fetch_yfinance(code, board, start, end):
+    """Independent Hong Kong backup: Yahoo through yfinance, restricted to CMOC.
+
+    Verify original ticker and HKD currency. Raw Close from auto_adjust=False
+    is not dividend-adjusted. Yahoo can amend historical prices for splits.
+    """
+    if board != "H":
+        raise ValueError("Yahoo backup only configured for Hong Kong stocks")
+    import yfinance as yf
+    symbol = str(int(code)) + ".HK"
+    ticker = yf.Ticker(symbol)
+    begin = dt.datetime.strptime(start, "%Y%m%d").date()
+    until = dt.datetime.strptime(end, "%Y%m%d").date() + dt.timedelta(days=1)
+    frame = ticker.history(
+        start=begin.isoformat(), end=until.isoformat(),
+        interval="1d", auto_adjust=False, actions=False, raise_errors=True,
+    )
+    if frame is None or frame.empty or "Close" not in frame:
+        raise ValueError("Yahoo returned no unadjusted Close")
+    metadata = ticker.get_history_metadata()
+    if str(metadata.get("currency", "")).upper() != "HKD":
+        raise ValueError("Yahoo quote currency is not HKD")
+    exchange = str(metadata.get("exchangeName", metadata.get("exchange", ""))).upper()
+    if exchange and exchange not in ("HKG", "HKSE", "HONG KONG STOCK EXCHANGE"):
+        raise ValueError("Yahoo unexpected HK exchange " + exchange)
+    rows = []
+    for day, close in frame["Close"].items():
+        if not math.isfinite(float(close)) or float(close) <= 0:
+            continue
+        rows.append({"date": day.date().isoformat(), "close": float(close)})
+    return parse_rows(rows)
+
+
 def fetch_sge_gold():
     """Shanghai Au99.99 close in CNY/gram, NOT international spot XAU/USD."""
     import akshare as ak
@@ -135,9 +200,13 @@ def merge_bars(existing, incoming, *, mismatch=.075, limit=1000):
     return merged[-limit:]
 
 
-def pick_stock_history(code, board, start, end, today, primary, backup):
+def pick_stock_history(code, board, start, end, today, primary, backup, tertiary=None):
     failures = []
-    for name, call in [("AKShare", primary), ("efinance", backup)]:
+    providers = [("AKShare", primary), ("efinance", backup)]
+    # Independent third source is used only for CMOC; never silently substitute a different ticker.
+    if tertiary and code == ("603993" if board == "A" else "03993"):
+        providers.append(("BaoStock" if board == "A" else "yfinance", tertiary))
+    for name, call in providers:
         try:
             rows = recent_valid(call(code, board, start, end), today)
             return rows, name, failures
@@ -214,6 +283,33 @@ def apply_daily_data(snapshot, history, quotes, gold_bars, *, today, gold_name="
     return result, market_history, report
 
 
+def history_to_csv(history, destination):
+    """CSV suitable for browser-only import. Gold instrument and unit are explicit."""
+    lines = history["series"]
+    labels = {
+        "gold": {day: price for day, price in lines.get("gold", [])},
+        "zijinA": {day: price for day, price in lines.get("zijinA", [])},
+        "zijinH": {day: price for day, price in lines.get("zijinH", [])},
+    }
+    calendar = sorted(set().union(*(set(d) for d in labels.values())))
+    instrument = history.get("goldInstrument", "XAU/USD")
+    unit = history.get("goldUnit", "USD/oz")
+    if (instrument, unit) not in (("SGE Au99.99", "CNY/g"), ("XAU/USD", "USD/oz")):
+        raise ValueError("Cannot export a gold series with unknown units")
+    with destination.open("w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["date", "gold", "zijin_a", "zijin_h", "gold_instrument", "gold_unit"])
+        for day in calendar:
+            writer.writerow([
+                day,
+                labels["gold"].get(day, ""),
+                labels["zijinA"].get(day, ""),
+                labels["zijinH"].get(day, ""),
+                instrument, unit,
+            ])
+    return len(calendar)
+
+
 def run(args):
     today = dt.date.fromisoformat(args.today) if args.today else dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date()
     start = (today - dt.timedelta(days=args.lookback)).strftime("%Y%m%d")
@@ -224,7 +320,10 @@ def run(args):
     errors = []
     for ticker, (code, board, currency) in STOCKS.items():
         try:
-            rows, source, fallback_errors = pick_stock_history(code, board, start, end, today, fetch_akshare, fetch_efinance)
+            third = fetch_baostock if board == "A" else fetch_yfinance
+            rows, source, fallback_errors = pick_stock_history(
+                code, board, start, end, today, fetch_akshare, fetch_efinance, third
+            )
             quotes[ticker] = (rows, source)
             print(f"OK {ticker} {source} {len(rows)} bars latest {rows[-1][0]} {rows[-1][1]} {currency}")
         except Exception as exc:
@@ -265,7 +364,9 @@ def run(args):
         base.mkdir(parents=True, exist_ok=True)
         (base / "snapshot.json").write_text(json.dumps(next_snapshot, ensure_ascii=False, indent=2) + "\n", "utf-8")
         (base / "market-history.json").write_text(json.dumps(next_history, ensure_ascii=False, indent=2) + "\n", "utf-8")
-        print("Private research files saved locally; no GitHub publication occurred.")
+        csv_count = history_to_csv(next_history, base / "market-history.csv")
+        (base / "data-quality-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", "utf-8")
+        print(f"Local research bundle saved ({csv_count} dated rows). Nothing committed to GitHub Pages.")
     return 0
 
 

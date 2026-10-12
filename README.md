@@ -10,6 +10,50 @@
 - 手工维护股价、交易日、商品价格、核验状态；本地持久化及 JSON 导入导出；
 - 资料来源、模型假设、风险提示。
 
+
+## 免费 A/H 行情采集（v1.3 · AKShare 主源 + efinance 备用）
+
+现在可以在**不申请 API Key**的情况下从 Python 拉取 A/H 历史日线。默认 `scripts/free_market_sync.py` 以**只读取、不改写 GitHub 数据**的干跑模式执行；AKShare 先请求不复权收盘价，无法取得或数据过旧时才尝试 efinance（`fqt=0`）。
+
+覆盖所有 **12 只 A/H 股票**。历史走势图中的黄金可使用 **上海黄金交易所 Au99.99（CNY/克）**：这**不是**国际伦敦现货黄金 XAU/USD（USD/盎司），不能代替国际金价用于美元金价估值。界面会自动切换黄金品种和单位标签。为了避免币种/时区错配，程序不会尝试在未核验汇率时把 Au99.99 转成美元/盎司，也不会凭此自动通过情绪错杀雷达中的国际金价检验。
+
+### 本地免费运行（无需 API Key）
+
+需要 Python 3.11+：
+
+```bash
+python -m pip install "akshare>=1.16,<3" "efinance>=0.5,<1" "pandas>=2,<3"
+python scripts/free_market_sync.py
+# 默认只打印真实市场请求、来源及校验结果，不覆盖 data/ 中的文件
+python scripts/free_market_sync.py --output-dir ./private_market_data
+# 将通过校验的结果写到本机私有文件夹，不发布到公开 GitHub 仓库
+```
+
+运行测试（测试使用模拟测试夹具，不访问行情服务器）：`python -m unittest discover -s tests -p 'test_*.py' -v`。
+
+**数据标准：**仅接收价格大于0、有效日期和正确交易代码的日线；根据交易市场独立计算前5交易日收益，拒绝9天以上的过时数据、重复日期或与仓库同日行情差异过大的数据；不会自动填充周末、节假日或停牌缺口。采集失败时保留旧数据，新的股票收盘价会使原有基本面事件/现金流审核状态重新待核验。
+
+### GitHub Actions 免费采集工作流
+
+在 <https://github.com/moliq1/mining-valuation-radar/actions/workflows/free-market-sync.yml> 找到 **Free EOD research sync (AKShare / efinance)**，选择 **Run workflow → dry_run=true**：不需要密钥或公开数据授权，即可测试 GitHub 的执行环境能否访问接口（获取失败会在日志中注明）。这不会让数据自动出现在公开 GitHub Pages。
+
+⚠ **AKShare/efinance 免费读取 ≠ 东方财富或交易所授权向公众再分发。** 若以后希望每天自动提交到公开仓库，必须先取得上游行情公开展示/再分发许可，并自行在仓库 **Settings → Secrets and variables → Actions → Variables** 中设置以下变量：
+
+- `MARKET_DATA_PUBLICATION_AUTHORIZED=true`：确认网站公开展示获得授权；
+- `FREE_DATA_REDISPLAY_RIGHTS_VERIFIED=true`：确认 AKShare、efinance 上游及上金所相应数据使用/再分发条款；
+- `FREE_MARKET_SYNC_ENABLED=true`：明确启用这一条免费的自动发布工作流。
+
+**只有三个变量全部明确设置，且手工执行 `dry_run=false` 或进入预定工作日时，才可能提交到 GitHub Pages。** 不应在尚未取得授权时自行把变量设为 true。这些开关只是安全闸门，不是授权凭证。公开版本如果没有权利，应继续使用已有的**用户 CSV 本地导入**方式，或更换具有再分发授权的行情提供商。
+
+另有可选的 `market-sync.yml`（Twelve Data），需要付费覆盖范围与展示授权。**只启用一种自动公开同步方案**，避免多个数据源同时写入行情文件；两种工作流共用 concurrency group。
+
+### 数据质量与局限
+
+- 股票价格均按不复权 EOD、原市场本币保存：A 股人民币，H 股港币。未完成除权调整时，跨除权日的历史收益不等于真实投资者总回报。
+- 上金所 `Au99.99` 使用 CNY/克，和 XAU/USD 的定价市场、交易时间、汇率均不同；归一化图可以研究方向，但不能把前者数字直接当成国际金价。
+- 东方财富、AKShare、efinance 的数据可用性可能随网站、反爬、接口变化而波动；每日运行**不是**行情服务质量保证。
+- 金属/估值参数和财报利润**不会**因下载股票价格就自动更新；缺少独立核实的国际金价时，国际金价的5日变化仍为 `null`，相关错杀信号不会误报。
+
 ## 本地运行
 ```bash
 python3 -m http.server 4173 --bind 127.0.0.1
@@ -30,7 +74,7 @@ npm test
 采用 **2026H1 利润 × 2 × 盈利可持续系数**，叠加金、银、铜价格相对于 H1 参考均价变化的利润敏感度，再乘以各情景人工假设的 PE。模型不是 DCF、不是已审计的正式盈利预测，也不是投资建议。
 部分公司产量暂作销量代理，少数股东权益、AISC、税费、净债务、资本开支可能改变结论。洛阳钼业钴/钨/贸易及可转债稀释未完整建模，盛达资源银产销量口径有待进一步核对。紫金矿业与紫金黄金国际存在母子公司敞口重叠。
 
-**V1.1：现已具备可选的 GitHub Actions EOD 自动更新管道（默认未启用）。** 仓库主人需要自行开通有权公开展示的行情源、设置 API 密钥及确认发布权限。未配置时继续显示历史快照。没有自动财报抓取、后台邮件/微信提醒；基本面闸门从不由行情自动通过。
+**V1.3：提供免费的 AKShare 主源 / efinance 备源（默认只读），以及可选的 Twelve Data GitHub Actions EOD 同步；默认均不向公开网站推送未经授权的数据。** 仓库主人需要自行开通有权公开展示的行情源、设置 API 密钥及确认发布权限。未配置时继续显示历史快照。没有自动财报抓取、后台邮件/微信提醒；基本面闸门从不由行情自动通过。
 
 ## 开启每日收盘数据同步（需要行情授权）
 

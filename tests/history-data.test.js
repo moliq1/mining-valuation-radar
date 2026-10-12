@@ -22,7 +22,7 @@ test('A/H both mode compares only jointly observed days',()=>{
  const data=fixture();const out=compareHistory(data,{stock:'both',period:'all'});
  assert.equal(out.commonCount,18);
  assert.equal(out.wanted.length,3);
- assert.throws(()=>compareHistory(data,{stock:'both',mode:'dual',period:'all'}),/双轴/);
+ assert.throws(()=>compareHistory(data,{stock:'both',mode:'dual',period:'all'}),/右轴/);
 });
 test('one month and three month filters restrict the timeline',()=>{
  const data=fixture();

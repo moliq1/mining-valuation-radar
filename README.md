@@ -1,3 +1,32 @@
+## 获取行情走势图的下一步：第三行情备源与可下载的只读研究包（v1.4）
+
+### CMOC（洛阳钼业）独立第三备源
+
+上次 GitHub Actions 的 `603993.SH` 与 `03993.HK` 因东方财富链路中断未能成功采集。现在：
+
+- **A股 603993.SH**：AKShare → efinance → **BaoStock**（`sh.603993`，日线，`adjustflag=3` 不复权）。
+- **H股 03993.HK**：AKShare → efinance → **Yahoo Finance / yfinance**（`3993.HK`，`Close`、`auto_adjust=False`，需核验 HKD 和市场标识）。
+- 只有前两路失败时才访问第三方；历史日期、币种、证券标识、数据时效和前五交易日异常仍严格校验。第三源可用性不保证；Yahoo 属非官方接口、数据使用受其许可限制。
+
+### 一次 GitHub Actions 干跑 → 下载 CSV → 浏览器看走势
+
+1. 打开 [免费行情工作流](https://github.com/moliq1/mining-valuation-radar/actions/workflows/free-market-sync.yml)，选择 **Run workflow**、保持 `dry_run=true`。
+2. 等待任务 `fetch` 成功，点击本次运行的 **Summary** 页面，在下方 **Artifacts** 下载 `ore-eod-research-<run_id>` 压缩包（保留2天）。
+3. 解压后获得 `market-history.csv`、`market-history.json`、`snapshot.json`、`data-quality-report.json`；重点查看 report 的 **fetchFailures** 和 **updated**。如果源失败则相应日期不会被补造。
+4. 打开 [ORE Radar 走势图](https://moliq1.github.io/mining-valuation-radar/#history)，选择 **导入 CSV / JSON**，上传压缩包内的 **`market-history.csv` 或 `market-history.json`**，即可在你当前的浏览器中显示真实历史收盘曲线。图表会识别 `gold_instrument=SGE Au99.99` 和 `gold_unit=CNY/g`，并与 A/H 股票的不同计价币种并列显示。
+5. 上传数据仅保存在**当前浏览器本地存储**；不提交到仓库。换浏览器/清除浏览器数据会失去手动导入的记录。
+
+**重要的隐私/版权界限：**在公开 GitHub 仓库，Actions artifact 即便没有部署到 Pages，也**可能被有仓库读取权限的人访问**，因此不能称为私密存储。若需要严格在自己电脑使用数据，执行：
+
+```bash
+pip install akshare efinance baostock yfinance pandas
+python scripts/free_market_sync.py --output-dir ./private_market_data
+```
+
+随后把本地的 `private_market_data/market-history.csv` 上传网页即可，GitHub 不会保存这份行情原始文件。项目不会在未核实第三方再分发授权时自动把原始行情加入公开 GitHub Pages。部分 Yahoo 数据在公司分股事件前有拆股调整，不代表含分红再投的实际收益；国际现货金 XAU/USD 与上海 Au99.99 不能互换。
+
+---
+
 # ORE Radar · 金银铜矿业 A/H 动态估值雷达
 
 **8 家矿业上市公司、12 只 A/H 股票的交互式估值研究仪表盘**。无需服务端或第三方 JavaScript 依赖，可以通过 GitHub Pages 托管。

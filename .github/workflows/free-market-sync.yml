@@ -67,6 +67,26 @@ jobs:
               python scripts/free_market_sync.py
             fi
           fi
+      - name: Summarize read-only price coverage
+        if: github.event_name == 'workflow_dispatch' && steps.gate.outputs.mode == 'dry-run'
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/ore-research-data/data-quality-report.json" ]]; then
+            python - "$RUNNER_TEMP/ore-research-data/data-quality-report.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json, sys
+          info=json.load(open(sys.argv[1],encoding='utf-8'))
+          updated=info.get('updated',[])
+          failures=info.get('fetchFailures',[])+info.get('failed',[])
+          print("### EOD dry-run results")
+          print(f"- A/H securities refreshed: **{len(updated)}/12**")
+          print(f"- Shanghai Au99.99 received: **{'yes' if info.get('goldUpdated') else 'no'}**")
+          print("- Download `market-history.csv` from the artifact below and upload it in the ORE Radar History view.")
+          if failures:
+            print("- Provider warnings and missing tickers:")
+            for item in failures[:15]: print("  - "+str(item).split(":",1)[0])
+          print("- The artifact is not published to Pages, but is **not confidential on a public repository**.")
+          PY
+          fi
       - name: Upload optional dry-run research download
         if: github.event_name == 'workflow_dispatch' && steps.gate.outputs.mode == 'dry-run'
         uses: actions/upload-artifact@v4

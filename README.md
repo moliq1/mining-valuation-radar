@@ -29,6 +29,18 @@ python scripts/free_market_sync.py --output-dir ./private_market_data
 
 # ORE Radar · 金银铜矿业 A/H 动态估值雷达
 
+## 金价 × 紫金矿业实时托管走势图（新增，不需要 API Key）
+
+仓库主页的 [走势图](https://moliq1.github.io/mining-valuation-radar/#history) 现有两张由 **TradingView 官方托管**的历史价格百分比比较图：
+
+- 黄金 **OANDA:XAUUSD** 对比紫金矿业 A 股 **SSE:601899**；
+- 黄金 **OANDA:XAUUSD** 对比紫金矿业 H 股 **HKEX:2899**。
+
+两者均为各自基准期百分比变化，行情及延迟由 TradingView 提供。走势图可直接打开，无需用户生成 CSV、无需在公开仓库存储或复制原始交易所历史数据，也没有任何数据源令牌。两张图底部保留 TradingView 署名，使用官方 Symbol Overview widget 和 `compareSymbol` 功能（[官方比较图文档](https://www.tradingview.com/widget-docs/widgets/charts/symbol-overview/demos/compare/)）。
+
+**重要界限**：这不是「把 Yahoo/AKShare 的历史数据抓取后直接提交公开仓库」；TradingView 的第三方 iframe 载入服务商自身的行情。上方托管图表无法提供本地 Pearlson 系数、CSV 等原始数据计算。下方「本地统计」继续使用有权保存和分析的用户导入 CSV/JSON。若组件受网络或浏览器扩展拦截，可点击对应 TradingView 的官方证券页面；同时可按仓库之前提供的办法使用 Actions 数据包或本地采集，不等于原始行情被授权公开再分发。
+
+
 **8 家矿业上市公司、12 只 A/H 股票的交互式估值研究仪表盘**。无需服务端或第三方 JavaScript 依赖，可以通过 GitHub Pages 托管。
 
 ## 功能

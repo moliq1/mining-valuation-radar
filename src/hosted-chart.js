@@ -108,7 +108,7 @@ export async function loadDirectHistory(fetcher=fetchKlines){
   }),warnings
  };
 }
-export function mountPublicMarketCharts(container,renderChart){
+export function mountPublicMarketCharts(container,renderChart,bindHover){
  if(!container)return;
  let state={history:null,period:'6m',warnings:[],loading:true};
  const chartLink=`<div class="hist-source" style="margin-top:16px">
@@ -128,7 +128,7 @@ export function mountPublicMarketCharts(container,renderChart){
    let result=compareHistory(state.history,{stock:key,period:state.period,mode:'indexed'});
    const headline=key==='zijinA'?'紫金矿业 A 股 · 601899.SH':'紫金矿业 H 股 · 02899.HK';
    const usable=result.enough;
-   return `<section class="panel hosted-card">
+   return `<section class="panel hosted-card" data-online-stock="${key}">
      <div class="hosted-card-head"><div><h3>${nameGold(state.history)} vs ${headline}</h3>
      <p>${usable?result.start+' → '+result.end+' · '+result.commonCount+'个共同交易日':'暂时没有足够的共同历史行情'} · 两条曲线起点均为100</p></div>
      </div>
@@ -139,6 +139,11 @@ export function mountPublicMarketCharts(container,renderChart){
    </section>`;
   }).join('');
   container.innerHTML=header+`<div class="panel hist-toolbar"><div class="hist-control"><label>选择时间区间</label><div class="hist-togglebar">${periods}</div></div><button class="button" data-reload-ore-prices>↻ 重新加载行情</button></div><div class="hosted-grid">${content}</div>${warning?'<div class="panel hist-source">'+warning+'</div>':''}${chartLink}`;
+  for(const key of ['zijinA','zijinH']){
+   const card=container.querySelector('[data-online-stock="'+key+'"]');
+   const res=compareHistory(state.history,{stock:key,period:state.period,mode:'indexed'});
+   if(card&&res.enough&&typeof bindHover==='function')bindHover(card,res);
+  }
  }
  async function load(){
   state.loading=true;show();

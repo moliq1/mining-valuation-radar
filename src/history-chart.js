@@ -70,7 +70,7 @@ export function bindHover(container,view){
  });
 }
 
-export function repaintHistory(localContainer){
+export function repaintHistory(container){
  if(!container.isConnected)return;
  const src=importedHistory||marketHistory;
  const view=compareHistory(src,{stock:selectedStock,period:selectedPeriod,mode:selectedMode});

@@ -1,4 +1,5 @@
 import {normalizeHistory,compareHistory,historyFromCsv,HISTORY_NAMES,HISTORY_UNITS} from './history-data.js';
+import {mountPublicMarketCharts} from './hosted-chart.js';
 const HISTORY_URL = new URL('../data/market-history.json', import.meta.url);
 const CACHE_KEY = 'ore-history-import-v1';
 const PALETTE = {gold:'#c09449',zijinA:'#387ab6',zijinH:'#168f83'};
@@ -69,7 +70,7 @@ export function bindHover(container,view){
  });
 }
 
-export function repaintHistory(container){
+export function repaintHistory(localContainer){
  if(!container.isConnected)return;
  const src=importedHistory||marketHistory;
  const view=compareHistory(src,{stock:selectedStock,period:selectedPeriod,mode:selectedMode});
@@ -82,7 +83,7 @@ export function repaintHistory(container){
  const corr=view.enough?view.wanted.filter(k=>k!=='gold').map(k=>`<div class="hist-corr">${escapeHtml(instrumentName(k,view))} vs 金价，交集交易日收益 Pearson 相关系数：<strong>${number(view.correlations[k],3)}</strong></div>`).join(''):'';
  const allKeys=['gold','zijinA','zijinH'];
  const counts=allKeys.map(k=>`${instrumentName(k,view)}：${src.series[k]?.length||0}条`).join(' · ');
- container.innerHTML=`<div class="hist-intro"><div><div class="eyebrow">MARKET VISUALIZATION / EOD RESEARCH</div><h2>黄金价格 × 紫金矿业 · 走势图</h2><p>直观看金价变化与紫金 A/H 股价的同步性、强弱差及时间错位。</p></div><span class="hist-state">${src.status==='unconfigured'?'行情源尚未配置':src.status==='imported'?'用户导入':'历史收盘数据 · 非实时'}</span></div>
+ container.innerHTML=`<div class="hist-intro"><div><div class="eyebrow">LOCAL DATA ANALYTICS / CSV & JSON</div><h2>本地统计 · 自有行情数据</h2><p>直观看金价变化与紫金 A/H 股价的同步性、强弱差及时间错位。</p></div><span class="hist-state">${src.status==='unconfigured'?'行情源尚未配置':src.status==='imported'?'用户导入':'历史收盘数据 · 非实时'}</span></div>
  ${controls}<div class="panel hist-chart-panel"><div class="hist-chart-top"><div><h3>${instrumentName('gold',view)} vs 紫金矿业</h3><p>${view.enough?view.start+' 至 '+view.end+' · '+view.commonCount+'个共有交易日':'等待足够的真实历史行情'}</p></div><div class="hist-legends">${legend}</div></div>${makeChart(view)}${metrics}<div class="hist-correlations">${corr}</div>
  <div class="hist-source"><div><strong>源：</strong>${escapeHtml(src.provider||'未注明')}${src.updatedAt?' · 更新 '+escapeHtml(src.updatedAt):''} · ${escapeHtml(counts)}</div>
  <div class="hist-dimension">黄金 <b>${instrumentName('gold',view)}（${instrumentUnit('gold',view)}）</b>，A股 <b>人民币/股</b>，H股 <b>港元/股</b>。归一化显示各自相对回报，不剔除汇率波动。</div>
@@ -95,7 +96,9 @@ export function repaintHistory(container){
 
 export async function mountHistoryPanel(container){
  if(!container)return;
- container.innerHTML='<div class="panel hist-loading">加载历史行情...</div>';
+ container.innerHTML='<section id="hosted-live-comparisons"></section><section id="history-local-statistics"><div class="panel hist-loading">加载本地统计数据...</div></section>';
+ mountPublicMarketCharts(container.querySelector('#hosted-live-comparisons'));
+ const localContainer=container.querySelector('#history-local-statistics');
  if(!marketHistory){
   try{const response=await fetch(new URL('../data/market-history.json',import.meta.url),{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);marketHistory=normalizeHistory(await response.json());}
   catch(error){marketHistory=normalizeHistory({schemaVersion:1,status:'unconfigured',provider:'未读取到公开历史数据',notes:String(error),series:{}});}
@@ -103,14 +106,14 @@ export async function mountHistoryPanel(container){
  try{const local=localStorage.getItem('ore-history-import-v1');if(local)importedHistory=normalizeHistory(JSON.parse(local));}
  catch{importedHistory=null;}
  if(!container.isConnected)return;
- repaintHistory(container);
+ repaintHistory(localContainer);
  container.addEventListener('click',event=>{
   const el=event.target.closest('button');if(!el)return;
-  if(el.dataset.histStock){selectedStock=el.dataset.histStock;if(selectedStock==='both')selectedMode='indexed';repaintHistory(container);}
-  else if(el.dataset.histPeriod){selectedPeriod=el.dataset.histPeriod;repaintHistory(container);}
-  else if(el.dataset.histMode){selectedMode=el.dataset.histMode;if(selectedMode==='dual'&&selectedStock==='both')selectedStock='zijinA';repaintHistory(container);}
+  if(el.dataset.histStock){selectedStock=el.dataset.histStock;if(selectedStock==='both')selectedMode='indexed';repaintHistory(localContainer);}
+  else if(el.dataset.histPeriod){selectedPeriod=el.dataset.histPeriod;repaintHistory(localContainer);}
+  else if(el.dataset.histMode){selectedMode=el.dataset.histMode;if(selectedMode==='dual'&&selectedStock==='both')selectedStock='zijinA';repaintHistory(localContainer);}
   else if(el.hasAttribute('data-hist-template'))downloadHistoryText('mining-gold-zijin-template.csv','date,gold,zijin_a,zijin_h,gold_instrument,gold_unit\n');
-  else if(el.hasAttribute('data-hist-clear')){importedHistory=null;try{localStorage.removeItem('ore-history-import-v1')}catch{}repaintHistory(container);}
+  else if(el.hasAttribute('data-hist-clear')){importedHistory=null;try{localStorage.removeItem('ore-history-import-v1')}catch{}repaintHistory(localContainer);}
  });
  container.addEventListener('change',async event=>{
   if(event.target.id!=='hist-file')return;
@@ -119,7 +122,7 @@ export async function mountHistoryPanel(container){
   try{
    importedHistory=file.name.toLowerCase().endsWith('.json')?normalizeHistory(JSON.parse(await file.text())):historyFromCsv(await file.text());
    try{localStorage.setItem('ore-history-import-v1',JSON.stringify(importedHistory))}catch{}
-   repaintHistory(container);
+   repaintHistory(localContainer);
   }catch(error){window.alert('数据导入失败：'+error.message);}
  });
 }

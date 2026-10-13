@@ -49,7 +49,6 @@ export function publicCompareConfig(stock){
     bottomColor:'rgba(255,255,255,0)'
   };
 }
-const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 export function mountPublicMarketCharts(container){
   if(!container)return;
   const items=[['zijinA','紫金矿业 A 股','人民币 / 股'],['zijinH','紫金矿业 H 股','港币 / 股']];

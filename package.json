@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "python3 -m http.server 4173 --bind 127.0.0.1",
     "test": "node --test",
-    "check": "node --check src/app.js && node --check src/model.js && node --check src/zijin-forecast.js && node --check src/forecast-ui.js && node --check src/history-data.js && node --check src/history-chart.js && node --check scripts/update-market.mjs"
+    "check": "node --check src/app.js && node --check src/model.js && node --check src/zijin-forecast.js && node --check src/forecast-ui.js && node --check src/history-data.js && node --check src/history-chart.js && node --check scripts/update-market.mjs && node --check src/hosted-chart.js"
   },
   "engines": {
     "node": ">=18"

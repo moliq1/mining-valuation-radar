@@ -29,16 +29,19 @@ python scripts/free_market_sync.py --output-dir ./private_market_data
 
 # ORE Radar · 金银铜矿业 A/H 动态估值雷达
 
-## 金价 × 紫金矿业实时托管走势图（新增，不需要 API Key）
+## 紫金矿业 × 黄金走势图（原生 SVG，浏览器直接读数，无 TradingView iframe）
 
-仓库主页的 [走势图](https://moliq1.github.io/mining-valuation-radar/#history) 现有两张由 **TradingView 官方托管**的历史价格百分比比较图：
+在 [走势图](https://moliq1.github.io/mining-valuation-radar/#history) 最上方分别绘制：
+- **国际现货金 XAU/USD**（美元/盎司）与 **紫金矿业 A 601899.SH**（人民币/股）；
+- **国际现货金 XAU/USD** 与 **紫金矿业 H 02899.HK**（港币/股）。
 
-- 黄金 **OANDA:XAUUSD** 对比紫金矿业 A 股 **SSE:601899**；
-- 黄金 **OANDA:XAUUSD** 对比紫金矿业 H 股 **HKEX:2899**。
+页面直接从浏览器向东方财富网页日 K 数据接口（`push2his.eastmoney.com`）请求日线，并在页面通过本地 SVG 绘制**共同基准=100**的两条相对涨跌曲线，支持 1M / 3M / 6M / 1Y / 全部区间和悬停查看日期、收盘价。**不再依赖 TradingView 跨站 iframe**，也不会将免费行情复制进公开 GitHub 仓库。股票采用不复权日线，收益率比较未进行外汇对冲和分红再投资调整。
 
-两者均为各自基准期百分比变化，行情及延迟由 TradingView 提供。走势图可直接打开，无需用户生成 CSV、无需在公开仓库存储或复制原始交易所历史数据，也没有任何数据源令牌。两张图底部保留 TradingView 署名，使用官方 Symbol Overview widget 和 `compareSymbol` 功能（[官方比较图文档](https://www.tradingview.com/widget-docs/widgets/charts/symbol-overview/demos/compare/)）。
+三种证券的网页接口代码为：国际现货金 `122.XAU`、A 股 `1.601899`、H 股 `116.02899`。如果 XAU 历史行情无法读取，改用 **上金所 Au99.99 `118.AU9999`，单位 CNY/克**，并在图表中更改黄金品种标签；不会谎称其为国际现货金。
 
-**重要界限**：这不是「把 Yahoo/AKShare 的历史数据抓取后直接提交公开仓库」；TradingView 的第三方 iframe 载入服务商自身的行情。上方托管图表无法提供本地 Pearlson 系数、CSV 等原始数据计算。下方「本地统计」继续使用有权保存和分析的用户导入 CSV/JSON。若组件受网络或浏览器扩展拦截，可点击对应 TradingView 的官方证券页面；同时可按仓库之前提供的办法使用 Actions 数据包或本地采集，不等于原始行情被授权公开再分发。
+上游行情是网页非正式接口，不是受 SLA 保障的数据服务，可能遇到反爬、地区网络限制或接口变更。**若金价或股票接口失败，将显示明确错误及直达原始行情源的链接，绝不伪造走势。** 页面底部保留用户 CSV/JSON 导入的原生统计模块作为可靠离线备选。
+
+数据在访客的浏览器内直接使用，不额外把原始日线公开存储；但直接调用上游接口仍需遵守数据方的使用条款，不保证能在所有地区和网络中成功获取。
 
 
 **8 家矿业上市公司、12 只 A/H 股票的交互式估值研究仪表盘**。无需服务端或第三方 JavaScript 依赖，可以通过 GitHub Pages 托管。

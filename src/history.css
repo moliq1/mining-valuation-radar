@@ -31,3 +31,18 @@
 .hist-import-buttons{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.hist-disclaimer{font-size:11px;color:#94a5b1;margin:19px 0;line-height:1.9}
 @media(max-width:950px){.hist-import{flex-direction:column;align-items:start}.hist-toolbar{gap:14px}.hist-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.hist-intro{flex-direction:column;align-items:start}.hist-intro h2{font-size:21px}.hist-chart-top{flex-direction:column}.hist-togglebar{gap:0}.hist-toggle{padding:7px 6px}.hist-chart-panel{padding:12px}.hist-stats{grid-template-columns:1fr}.hist-stat strong{font-size:20px}.hist-tooltip{min-width:220px;font-size:10px}}
+
+/* Provider-hosted market charts: live upstream widgets, no redistribution of EOD CSV. */
+.hosted-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-bottom:15px}
+.hosted-card{min-width:0;padding:19px}
+.hosted-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:10px}
+.hosted-card-head h3{font-size:14px;margin:0 0 7px;color:#183447;font-weight:800}
+.hosted-card-head p{font-size:11px;color:#8196a7;line-height:1.5;margin:0}
+.hosted-card-head>a{color:#426e94;font-size:11px;white-space:nowrap;text-decoration:underline}
+.tv-widget-holder{height:460px;min-height:330px;width:100%;background:#f8fafc;border:1px solid #e8edf1;border-radius:8px;overflow:hidden}
+.tv-widget-holder iframe{border:0}
+.tv-provider{font-size:11px;color:#8192a3;padding:12px 1px 0;line-height:1.65}
+.tv-provider a{color:#466f92;text-decoration:underline}
+#history-local-statistics{margin-top:24px;padding-top:17px;border-top:1px solid #dee6eb}
+@media(max-width:1250px){.hosted-grid{grid-template-columns:1fr}.tv-widget-holder{height:440px}}
+@media(max-width:650px){.hosted-card{padding:13px}.hosted-card-head{flex-wrap:wrap}.tv-widget-holder{height:350px;min-height:300px}}

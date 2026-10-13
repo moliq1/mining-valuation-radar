@@ -97,7 +97,7 @@ export function repaintHistory(container){
 export async function mountHistoryPanel(container){
  if(!container)return;
  container.innerHTML='<section id="hosted-live-comparisons"></section><section id="history-local-statistics"><div class="panel hist-loading">加载本地统计数据...</div></section>';
- mountPublicMarketCharts(container.querySelector('#hosted-live-comparisons'),makeChart);
+ mountPublicMarketCharts(container.querySelector('#hosted-live-comparisons'),makeChart,bindHover);
  const localContainer=container.querySelector('#history-local-statistics');
  if(!marketHistory){
   try{const response=await fetch(new URL('../data/market-history.json',import.meta.url),{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);marketHistory=normalizeHistory(await response.json());}

@@ -45,10 +45,7 @@ export function parseEastmoneyHistory(payload,secid){
  return [...prices.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,close])=>({date,close}));
 }
 
-/** Same-origin CORS first. Fall back to documented JSONP callback for browsers
- *  where the upstream chooses not to return CORS headers. API may still block.
- *  Loads only from a fixed HTTPS allowlisted origin and uses non-secret data.
- */
+/** Uses the upstream's JSONP response. No third-party iframe or GitHub quote publication. */
 export function fetchKlines(secid,{timeoutMs=8500}={}){
  if(!Object.values(PUBLIC_CHART_SYMBOLS).includes(secid))return Promise.reject(Error('不支持的行情代码'));
  return new Promise((resolve,reject)=>{
@@ -111,42 +108,37 @@ export async function loadDirectHistory(fetcher=fetchKlines){
   }),warnings
  };
 }
-function displayRows(state,chart){
- const periods=RESEARCH_PERIODS.map(p=>\`<button class="hist-toggle \${state.period===p?'active':''}" data-online-range="\${p}">\${p==='all'?'全部':p.toUpperCase()}</button>\`).join('');
- return \`<div class="hist-control"><label>价格比较区间</label><div class="hist-togglebar">\${periods}</div></div>
- <div class="hist-chart-top"><div><h3>\${nameGold(state.history)}与紫金矿业走势图</h3><p>黄金：\${goldUnit(state.history)} · A股：人民币 · H股：港币</p></div></div>\${chart}\`;
-}
 export function mountPublicMarketCharts(container,renderChart){
  if(!container)return;
  let state={history:null,period:'6m',warnings:[],loading:true};
- const chartLink=\`<div class="hist-source" style="margin-top:16px">
+ const chartLink=`<div class="hist-source" style="margin-top:16px">
  <b>数据源说明：</b>本功能直接由你的浏览器请求东方财富历史日线，不把价格文件存到公开 GitHub 仓库。免费网页接口可能被限流或调整，不能保证全天可用。黄金优先使用国际 XAU/USD；失败时改用上金所 Au99.99（人民币/克），并明确标注。以上均为未经复权处理的历史收盘价；相关性和相对涨幅不消除汇率影响。
- <div style="margin-top:7px"><a class="inline-link" href="\${DIRECT_LINKS.zijinA}" target="_blank" rel="noopener noreferrer">在东方财富查看紫金A股 ↗</a>　<a class="inline-link" href="\${DIRECT_LINKS.zijinH}" target="_blank" rel="noopener noreferrer">查看紫金H股 ↗</a>　<a class="inline-link" href="\${DIRECT_LINKS.goldBackup}" target="_blank" rel="noopener noreferrer">查看上金所黄金 ↗</a></div>
- </div>\`;
+ <div style="margin-top:7px"><a class="inline-link" href="${DIRECT_LINKS.zijinA}" target="_blank" rel="noopener noreferrer">在东方财富查看紫金A股 ↗</a>　<a class="inline-link" href="${DIRECT_LINKS.zijinH}" target="_blank" rel="noopener noreferrer">查看紫金H股 ↗</a>　<a class="inline-link" href="${DIRECT_LINKS.goldBackup}" target="_blank" rel="noopener noreferrer">查看上金所黄金 ↗</a></div>
+ </div>`;
  function show(){
   if(!container.isConnected)return;
-  const header=\`<div class="hist-intro"><div><div class="eyebrow">BROWSER PRICE HISTORY / NO IFRAME</div><h2>黄金价格 × 紫金矿业 · 走势图</h2><p>由本站的原生 SVG 绘制，不再依赖 TradingView 第三方嵌入框。</p></div><span class="hist-state">\${state.loading?'加载行情中':'第三方网页数据 · 非实时'}</span></div>\`;
+  const header=`<div class="hist-intro"><div><div class="eyebrow">BROWSER PRICE HISTORY / NO IFRAME</div><h2>黄金价格 × 紫金矿业 · 走势图</h2><p>由本站的原生 SVG 绘制，不再依赖 TradingView 第三方嵌入框。</p></div><span class="hist-state">${state.loading?'加载行情中':'第三方网页数据 · 非实时'}</span></div>`;
   if(state.loading){
-   container.innerHTML=header+\`<div class="panel hist-chart-panel"><div class="hist-empty"><div class="hist-empty-icon">⌁</div><b>正在获取真实历史收盘价</b><p>尝试国际现货黄金与紫金A/H，如网络无法访问将明确显示原因；不会绘制虚假曲线。</p></div></div>\`;
+   container.innerHTML=header+`<div class="panel hist-chart-panel"><div class="hist-empty"><div class="hist-empty-icon">⌁</div><b>正在获取真实历史收盘价</b><p>尝试国际现货黄金与紫金A/H，如网络无法访问将明确显示原因；不会绘制虚假曲线。</p></div></div>`;
    return;
   }
-  let warning=state.warnings.map(x=>\`<div class="hist-warning">⚠ \${x.replaceAll('<','&lt;')}</div>\`).join('');
-  const periods=RESEARCH_PERIODS.map(p=>\`<button class="hist-toggle \${state.period===p?'active':''}" data-online-range="\${p}">\${p==='all'?'全部':p.toUpperCase()}</button>\`).join('');
+  let warning=state.warnings.map(x=>`<div class="hist-warning">⚠ ${x.replaceAll('<','&lt;')}</div>`).join('');
+  const periods=RESEARCH_PERIODS.map(p=>`<button class="hist-toggle ${state.period===p?'active':''}" data-online-range="${p}">${p==='all'?'全部':p.toUpperCase()}</button>`).join('');
   const content=['zijinA','zijinH'].map(key=>{
    let result=compareHistory(state.history,{stock:key,period:state.period,mode:'indexed'});
    const headline=key==='zijinA'?'紫金矿业 A 股 · 601899.SH':'紫金矿业 H 股 · 02899.HK';
    const usable=result.enough;
-   return \`<section class="panel hosted-card">
-     <div class="hosted-card-head"><div><h3>\${nameGold(state.history)} vs \${headline}</h3>
-     <p>\${usable?result.start+' → '+result.end+' · '+result.commonCount+'个共同交易日':'暂时没有足够的共同历史行情'} · 两条曲线起点均为100</p></div>
+   return `<section class="panel hosted-card">
+     <div class="hosted-card-head"><div><h3>${nameGold(state.history)} vs ${headline}</h3>
+     <p>${usable?result.start+' → '+result.end+' · '+result.commonCount+'个共同交易日':'暂时没有足够的共同历史行情'} · 两条曲线起点均为100</p></div>
      </div>
-     \${usable?renderChart(result):\`<div class="hist-empty" style="min-height:245px"><b>该组合暂无可绘制的实际历史行情</b><p>\${result.reason||'请稍后重试或从下方导入已保存的CSV/JSON。'}</p></div>\`}
-     \${usable?\`<div class="hist-stats" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-     \${['gold',key].map(x=>\`<div class="hist-stat"><span class="hist-stat-title"><i style="background:\${PALETTE[x]}"></i>\${x==='gold'?nameGold(state.history):LABEL[x]}</span><strong class="\${result.totalReturns[x]>=0?'positive':'negative'}">\${percent(result.totalReturns[x])}</strong><small>相同日历日期比较；不含股息及汇率中性化</small></div>\`).join('')}
-     </div>\`:''}
-   </section>\`;
+     ${usable?renderChart(result):`<div class="hist-empty" style="min-height:245px"><b>该组合暂无可绘制的实际历史行情</b><p>${result.reason||'请稍后重试或从下方导入已保存的CSV/JSON。'}</p></div>`}
+     ${usable?`<div class="hist-stats" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+     ${['gold',key].map(x=>`<div class="hist-stat"><span class="hist-stat-title"><i style="background:${PALETTE[x]}"></i>${x==='gold'?nameGold(state.history):LABEL[x]}</span><strong class="${result.totalReturns[x]>=0?'positive':'negative'}">${percent(result.totalReturns[x])}</strong><small>相同日历日期比较；不含股息及汇率中性化</small></div>`).join('')}
+     </div>`:''}
+   </section>`;
   }).join('');
-  container.innerHTML=header+\`<div class="panel hist-toolbar"><div class="hist-control"><label>选择时间区间</label><div class="hist-togglebar">\${periods}</div></div><button class="button" data-reload-ore-prices>↻ 重新加载行情</button></div><div class="hosted-grid">\${content}</div>\${warning?'<div class="panel hist-source">'+warning+'</div>':''}\${chartLink}\`;
+  container.innerHTML=header+`<div class="panel hist-toolbar"><div class="hist-control"><label>选择时间区间</label><div class="hist-togglebar">${periods}</div></div><button class="button" data-reload-ore-prices>↻ 重新加载行情</button></div><div class="hosted-grid">${content}</div>${warning?'<div class="panel hist-source">'+warning+'</div>':''}${chartLink}`;
  }
  async function load(){
   state.loading=true;show();
